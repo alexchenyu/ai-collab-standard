@@ -1,0 +1,6 @@
+见 `CLAUDE.md`
+
+Lessons:
+- 默认使用中文；除非用户明确要求其它语言。
+- `.cursorrules` 保持极小，只放最不该忘的提醒；规则正文放 `CLAUDE.md`，经验放 `lesson_learned.md`，决策放 `docs/ADR/`。
+- TODO: 补一条本项目最重要且最容易忘的提醒
