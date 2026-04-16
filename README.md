@@ -17,23 +17,51 @@
 - `scripts/init_ai_collab_docs.sh`: 一键初始化/更新脚本
 - `docs/`: 存放所有模板文件和治理说明文档
 
-## 如何在项目中接入
+## 使用指南
 
-推荐将本仓库作为 Git Submodule 引入到你的业务项目中：
+推荐将本仓库作为 Git Submodule 引入到你的业务项目中，作为该项目的 `.ai-collab` 目录。
+
+### 第一步：引入 Submodule
+
+在你的项目根目录下执行：
 
 ```bash
-# 1. 在你的项目根目录下添加 submodule
 git submodule add https://github.com/your-org/ai-collab-standard.git .ai-collab
+```
+*(如果只在本地使用，可以使用本地路径：`git -c protocol.file.allow=always submodule add /path/to/ai-collab-standard .ai-collab`)*
 
-# 2. 运行初始化脚本
+### 第二步：一键初始化文档骨架
+
+调用仓库内的初始化脚本，它会自动探测你的目录结构（如 `backend`, `frontend`, `src` 等），并生成对应的文档：
+
+```bash
 bash .ai-collab/scripts/init_ai_collab_docs.sh . \
     --project-name "My Project" \
-    --agent-dir backend \
-    --agent-dir frontend
+    --lang zh
 ```
 
-默认不会覆盖已有文件；需要覆盖时加 `--force`。
-使用 `--help` 查看所有可用选项（如 `--lang`、`--dry-run` 等）。
+> **提示**：脚本默认是**安全模式**，不会覆盖你项目中已有的同名文件。如果想强制覆盖（比如想用最新的模板重置框架），可以加上 `--force` 参数。
+
+### 第三步：填写项目特有内容
+
+脚本跑完后，你的项目里会多出 `CLAUDE.md`、`.cursorrules`、`lesson_learned.md`、`docs/ADR/` 等文件。
+这些模板里预留了许多 `TODO` 占位符。运行以下命令查找并补全它们：
+
+```bash
+rg -n 'TODO' .
+```
+
+### 第四步：日常更新与维护
+
+当 `ai-collab-standard` 仓库（即本仓库）更新了新的模板或治理规范时，你可以在业务项目中一键拉取最新规范：
+
+```bash
+# 更新 submodule 到最新版本
+git submodule update --remote
+
+# （可选）如果治理规范文档（如 ai-collab-doc-governance.md）有重大更新，
+# 可以通过拷贝或带 --force 重新跑一遍脚本来同步最新架构思想。
+```
 
 ## 核心治理原则
 
