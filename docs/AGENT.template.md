@@ -2,6 +2,9 @@
 
 补充目录级 runbook。Repo 级规则先看 `{{ROOT_CLAUDE_PATH}}`，这里不重复。
 
+> 带 `TODO` 的模板文件不算已落地规范，也不应被当作 canonical source。
+> 首次引入后，应尽快补全真实入口、命令、测试和边界。
+
 ## 你在这里主要处理什么
 
 - TODO: 说明 `{{DIR_NAME}}/` 的核心职责

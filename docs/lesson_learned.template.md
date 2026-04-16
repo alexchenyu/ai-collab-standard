@@ -14,6 +14,7 @@
 
 - TODO: 记录一个必须长期保留的核心实现经验（例如："为什么这里必须用 UUID5 而不是 v4"）
 - TODO: 记录一个跨模块契约或关键边界（例如："写入 DB 前必须先过 review 状态"）
+- TODO: 记录一种高成本派生成果（如 `embedding` / chunk / parse result）的 cache key / invalidation 策略
 
 ### 常见坑 (示例主题)
 

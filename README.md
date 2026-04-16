@@ -51,6 +51,8 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . \
 rg -n 'TODO' .
 ```
 
+在补完这些 `TODO` 之前，不要把模板文件当作真正的 canonical source。
+
 ### 第四步：日常更新与维护
 
 当 `ai-collab-standard` 仓库（即本仓库）更新了新的模板或治理规范时，你可以在业务项目中一键拉取最新规范：
@@ -74,3 +76,4 @@ git submodule update --remote
 4. `AGENT.md` 只在目录存在独有 workflow 时才引入。
 5. `lesson_learned.md` 只放当前仍有效的非显而易见经验。
 6. ADR 只记录架构决策和提案，不记录日常实现碎片。
+7. 高成本派生成果必须有持久化与失效策略，不能把“重跑”当默认路径。
