@@ -5,6 +5,7 @@ usage() {
     cat <<'EOF'
 Usage:
   bash scripts/init_ai_collab_docs.sh TARGET_DIR [options]
+  bash scripts/init_ai_collab_docs.sh --check [TARGET_DIR]
 
 Bootstrap reusable AI collaboration docs into TARGET_DIR.
 By default, existing files are preserved.
@@ -17,12 +18,16 @@ Options:
   --lang LANG            Default language rule: zh | en (default: zh)
   --force                Overwrite existing files
   --dry-run              Print planned actions without writing files
+  --install-hook         Install pre-commit hook into .git/hooks (copies pre-commit.sh)
+  --check                Run the governance health check on TARGET_DIR instead of initializing
   -h, --help             Show this help
 
 Examples:
   bash scripts/init_ai_collab_docs.sh ../my-project
   bash scripts/init_ai_collab_docs.sh ../my-project --agent-dir backend --agent-dir frontend
   bash scripts/init_ai_collab_docs.sh ../my-project --project-name "Acme API" --lang en
+  bash scripts/init_ai_collab_docs.sh --check ../my-project
+  bash scripts/init_ai_collab_docs.sh ../my-project --install-hook
 EOF
 }
 
@@ -39,6 +44,8 @@ CONFIG_PATH=""
 LANG_OPTION="zh"
 FORCE=0
 DRY_RUN=0
+INSTALL_HOOK=0
+CHECK_ONLY=0
 declare -a AGENT_DIRS=()
 
 require_arg() {
@@ -83,6 +90,14 @@ while (($# > 0)); do
             DRY_RUN=1
             shift
             ;;
+        --install-hook)
+            INSTALL_HOOK=1
+            shift
+            ;;
+        --check)
+            CHECK_ONLY=1
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -104,6 +119,12 @@ while (($# > 0)); do
             ;;
     esac
 done
+
+if (( CHECK_ONLY == 1 )); then
+    CHECK_DIR="${TARGET_DIR:-$(pwd)}"
+    CHECK_DIR="${CHECK_DIR/#\~/$HOME}"
+    exec bash "$SCRIPT_DIR/check.sh" "$CHECK_DIR"
+fi
 
 if [[ -z "$TARGET_DIR" ]]; then
     usage
@@ -336,6 +357,10 @@ render_template \
     "$TARGET_DIR/docs/ai-collab-doc-governance.md"
 
 render_template \
+    "$TEMPLATE_DIR/PROJECT_STATUS.template.md" \
+    "$TARGET_DIR/docs/PROJECT_STATUS.md"
+
+render_template \
     "$TEMPLATE_DIR/ADR-README.template.md" \
     "$TARGET_DIR/docs/ADR/README.md"
 
@@ -352,6 +377,28 @@ for dir in "${AGENT_DIRS[@]}"; do
         "{{ROOT_CLAUDE_PATH}}=$claude_path"
 done
 
+# Optionally install pre-commit hook
+if (( INSTALL_HOOK == 1 )); then
+    HOOK_SRC="$SCRIPT_DIR/pre-commit.sh"
+    HOOK_DST="$TARGET_DIR/.git/hooks/pre-commit"
+    if [[ ! -f "$HOOK_SRC" ]]; then
+        note "warning: pre-commit.sh not found at $HOOK_SRC, skip hook install"
+    elif [[ ! -d "$TARGET_DIR/.git" ]]; then
+        note "warning: $TARGET_DIR is not a git repo, skip hook install"
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+        note "(dry-run) would install pre-commit hook to $HOOK_DST"
+    else
+        mkdir -p "$TARGET_DIR/.git/hooks"
+        if [[ -f "$HOOK_DST" && "$FORCE" -ne 1 ]]; then
+            note "pre-commit hook already exists at $HOOK_DST; use --force to overwrite"
+        else
+            cp "$HOOK_SRC" "$HOOK_DST"
+            chmod +x "$HOOK_DST"
+            note "installed pre-commit hook: $HOOK_DST"
+        fi
+    fi
+fi
+
 note "done"
 if [[ "$DRY_RUN" -eq 1 ]]; then
     note "(dry-run, nothing was written)"
@@ -360,4 +407,8 @@ else
     note "skipped: ${#SKIPPED_FILES[@]}"
     note "next: rg -n '\{\{[A-Z0-9_]+\}\}' \"$TARGET_DIR\"  # verify remaining placeholders"
     note "next: rg -n 'TODO' \"$TARGET_DIR\"  # fill in project-specific content"
+    note "next: bash $SCRIPT_DIR/check.sh \"$TARGET_DIR\"  # run governance health check"
+    if (( INSTALL_HOOK == 0 )); then
+        note "tip:  bash $SCRIPT_DIR/init_ai_collab_docs.sh \"$TARGET_DIR\" --install-hook  # enable pre-commit guardrail"
+    fi
 fi

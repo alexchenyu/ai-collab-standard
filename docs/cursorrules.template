@@ -1,6 +1,8 @@
-见 `CLAUDE.md`
+# 本文件不是 canonical source，仅做 Cursor 极简提醒；正文请去 CLAUDE.md / lesson_learned.md / docs/ADR/。
+# 目标长度：≤ 10 行正文；满了先删再加。
 
 Lessons:
 - 默认使用中文；除非用户明确要求其它语言。
-- `.cursorrules` 保持极小，只放最不该忘的提醒；规则正文放 `CLAUDE.md`，经验放 `lesson_learned.md`，决策放 `docs/ADR/`。
-- TODO: 补一条本项目最重要且最容易忘的提醒
+- 看规则先看 CLAUDE.md，看经验先看 lesson_learned.md，看状态先看 docs/PROJECT_STATUS.md，看架构决策先看 docs/ADR/。
+- 子目录有 AGENT.md 时，目录级操作先读 AGENT.md 再看 CLAUDE.md。
+- TODO: 补一条本项目最容易忘、必须长期记住的一句话提醒（保持 ≤ 1 行）
