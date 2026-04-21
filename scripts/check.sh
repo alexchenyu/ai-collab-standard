@@ -196,6 +196,14 @@ check_lines "$TARGET_DIR/.cursorrules" "$CURSORRULES_MAX" ".cursorrules"
 check_lines "$TARGET_DIR/AGENTS.md" "$AGENTS_MAX" "AGENTS.md"
 check_lines "$TARGET_DIR/lesson_learned.md" "$LESSON_HARD" "lesson_learned.md (硬上限)"
 check_lines "$TARGET_DIR/lesson_learned.md" "$LESSON_SOFT" "lesson_learned.md (软建议)" 0
+# 拆出来的 lesson_learned_<topic>.md 也受治理：每个 ≤ LESSON_SOFT
+shopt -s nullglob
+for f in "$TARGET_DIR"/lesson_learned_*.md; do
+    label="${f#$TARGET_DIR/}"
+    check_lines "$f" "$LESSON_SOFT" "$label (软建议)" 0
+    check_lines "$f" "$LESSON_HARD" "$label (硬上限)"
+done
+shopt -u nullglob
 check_lines "$TARGET_DIR/docs/PROJECT_STATUS.md" "$PROJECT_STATUS_MAX" "docs/PROJECT_STATUS.md" 0
 
 section "状态快照污染检查（CLAUDE.md / .cursorrules 不应混入数字）"
@@ -226,11 +234,70 @@ printf "通过：%d 项\n" "${#PASSED[@]}"
 printf "软警告：%d 项\n" "${#SOFT_WARNS[@]}"
 printf "硬失败：%d 项\n" "${#HARD_FAILS[@]}"
 
+# 启发式：根据失败/警告内容打印"一行修复建议"
+suggest_fix() {
+    local msgs_var="$1"   # 数组名
+    local -n msgs="$msgs_var"
+    local printed=0
+    for msg in "${msgs[@]}"; do
+        case "$msg" in
+            *"lesson_learned.md"*超长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • lesson_learned.md 超长 → 按主题自动拆分：\n"
+                printf "      \033[1mbash .ai-collab/scripts/split_lesson.sh\033[0m            # 干跑预览拆分计划\n"
+                printf "      \033[1mbash .ai-collab/scripts/split_lesson.sh --apply\033[0m    # 真正写盘\n"
+                ;;
+            *lesson_learned_*超长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                local file
+                file=$(printf '%s' "$msg" | grep -oE 'lesson_learned_[^ )]+\.md' | head -1)
+                printf "  • %s 超长 → 按 ### 子主题手动二次拆分到 lesson_learned_<sub>.md，并在原文件留导航。\n" "$file"
+                ;;
+            *.cursorrules*超长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • .cursorrules 超长 → 这是极简提醒层，把详情挪到 lesson_learned.md 对应主题，留下一句话导航。\n"
+                ;;
+            *CLAUDE.md*超长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • CLAUDE.md 超长 → 把不稳定/状态类内容迁到 docs/PROJECT_STATUS.md，深细节迁到 lesson_learned.md。\n"
+                ;;
+            *AGENTS.md*超长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • AGENTS.md 超长 → 仅保留入口指引，技术细节进 backend/AGENT.md 等子目录文件。\n"
+                ;;
+            *主题过长*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • lesson_learned.md 单个主题超 80 行 → 按 ### 子小节拆，或将该主题整段移出到 lesson_learned_<topic>.md：\n"
+                printf "      \033[1mbash .ai-collab/scripts/split_lesson.sh\033[0m\n"
+                ;;
+        esac
+    done
+}
+
 if (( ${#HARD_FAILS[@]} > 0 )); then
     printf "\n\033[31m硬失败列表：\033[0m\n"
     for f in "${HARD_FAILS[@]}"; do
         printf "  - %s\n" "$f"
     done
+    suggest_fix HARD_FAILS
     exit 1
 fi
 
@@ -239,6 +306,7 @@ if (( ${#SOFT_WARNS[@]} > 0 )); then
     for w in "${SOFT_WARNS[@]}"; do
         printf "  - %s\n" "$w"
     done
+    suggest_fix SOFT_WARNS
     exit 2
 fi
 
