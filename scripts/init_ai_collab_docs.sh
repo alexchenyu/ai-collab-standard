@@ -381,6 +381,18 @@ link_claude_skills() {
     # Make .cursor/skills/ also visible to Claude Code by symlinking
     # .claude/skills -> ../.cursor/skills.
     # Skip silently if .cursor/skills doesn't exist (project hasn't adopted skills yet).
+    #
+    # ── Why only Claude, not Codex? ─────────────────────────────────────
+    # Cursor scans .cursor/skills + .agents/skills + .claude/skills + .codex/skills
+    # without dedup -- every additional symlink causes Cursor to load the same
+    # skill twice, burning context. We accept the 1× duplicate cost for Claude
+    # (concrete, current value) but DON'T add .agents/skills for Codex (no
+    # current user, would add a second Cursor double-scan, and Cursor's
+    # .agents/skills path has a known slash-command bug).
+    # Re-evaluate when: Codex actually gets used / Cursor fixes dedup / skill
+    # count grows past ~15 (then switch to 3-copy + sync approach).
+    # See lesson_learned_11_agent_collab.md § 跨 agent skills 共享 for full rationale.
+    # ────────────────────────────────────────────────────────────────────
     local cursor_skills="$TARGET_DIR/.cursor/skills"
     local claude_dir="$TARGET_DIR/.claude"
     local claude_skills="$claude_dir/skills"
