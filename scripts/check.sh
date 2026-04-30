@@ -26,6 +26,7 @@ AGENTS_MAX=15
 LESSON_SOFT=350
 LESSON_HARD=600
 PROJECT_STATUS_MAX=120
+PROJECT_GLOSSARY_MAX=150
 AGENT_MD_SOFT=80
 LESSON_TOPIC_MAX=80
 
@@ -179,6 +180,45 @@ check_behavior_pointer() {
     fi
 }
 
+check_glossary() {
+    # 检查 docs/PROJECT_GLOSSARY.md：体积上限 + CLAUDE.md 指针
+    local file="$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
+    local claude="$TARGET_DIR/CLAUDE.md"
+    if [[ ! -f "$file" ]]; then
+        # 没建 glossary 不算硬错，但提醒一句
+        SOFT_WARNS+=("未建 docs/PROJECT_GLOSSARY.md（共享语言层），可用 .ai-collab/docs/PROJECT_GLOSSARY.template.md 起手")
+        printf "  \033[33m[WARN]\033[0m 未建 docs/PROJECT_GLOSSARY.md\n"
+        return 0
+    fi
+    check_lines "$file" "$PROJECT_GLOSSARY_MAX" "docs/PROJECT_GLOSSARY.md" 0
+    check_todo_residue "$file" "docs/PROJECT_GLOSSARY.md" 0
+    if [[ -f "$claude" ]]; then
+        if grep -q 'PROJECT_GLOSSARY\.md' "$claude" 2>/dev/null; then
+            PASSED+=("CLAUDE.md 已指向 PROJECT_GLOSSARY.md")
+            printf "  \033[32m[ OK ]\033[0m CLAUDE.md 已指向 PROJECT_GLOSSARY.md\n"
+        else
+            SOFT_WARNS+=("CLAUDE.md 未指向 docs/PROJECT_GLOSSARY.md（共享语言层指针缺失）")
+            printf "  \033[33m[WARN]\033[0m CLAUDE.md 未指向 docs/PROJECT_GLOSSARY.md\n"
+        fi
+    fi
+    # 锚点新鲜度（启发式）：抽 glossary 里出现的 lesson_learned_*.md / docs/*.md 路径，验证文件存在
+    local stale=0
+    while IFS= read -r ref; do
+        [[ -z "$ref" ]] && continue
+        local target="$TARGET_DIR/$ref"
+        if [[ ! -e "$target" ]]; then
+            SOFT_WARNS+=("PROJECT_GLOSSARY.md 锚点失效：$ref 不存在")
+            printf "  \033[33m[WARN]\033[0m 锚点失效：%s\n" "$ref"
+            stale=1
+        fi
+    done < <(grep -oE '`(lesson_learned[^`]*\.md|docs/[A-Za-z0-9_/-]+\.md|backend/[A-Za-z0-9_/.-]+|scripts/[A-Za-z0-9_/.-]+)`' "$file" 2>/dev/null \
+             | tr -d '`' | sort -u)
+    if (( stale == 0 )); then
+        PASSED+=("PROJECT_GLOSSARY.md 锚点全部存在")
+        printf "  \033[32m[ OK ]\033[0m PROJECT_GLOSSARY.md 锚点全部存在\n"
+    fi
+}
+
 check_duplicate_lines() {
     local -a files=()
     for f in "$TARGET_DIR/CLAUDE.md" "$TARGET_DIR/.cursorrules" "$TARGET_DIR/AGENTS.md" "$TARGET_DIR/lesson_learned.md"; do
@@ -242,6 +282,9 @@ check_agent_md_files
 
 section "行为约束层指针检查"
 check_behavior_pointer
+
+section "共享语言层（PROJECT_GLOSSARY）检查"
+check_glossary
 
 section "跨文件重复检查（canonical 冲突启发式）"
 check_duplicate_lines

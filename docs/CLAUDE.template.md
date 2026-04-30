@@ -18,6 +18,7 @@
 | ---- | ---- |
 | Repo 级高频规则 | 本文件 |
 | Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动） | `.ai-collab/docs/ai-collab-agent-behavior.md` |
+| 项目术语词典（共享语言） | `docs/PROJECT_GLOSSARY.md` |
 | 当前部署状态 / 数据规模 / 端口 | `docs/PROJECT_STATUS.md` |
 | 排障经验 / 踩坑结论 / 实现边界 | `lesson_learned.md` |
 | 架构决策 / 替代方案 | `docs/ADR/README.md` |

@@ -37,6 +37,7 @@
     ├── cursorrules.template                   # .cursorrules 模板
     ├── lesson_learned.template.md             # lesson_learned.md 模板
     ├── PROJECT_STATUS.template.md             # 状态快照模板（数据规模/端口/实例数）
+    ├── PROJECT_GLOSSARY.template.md           # 共享语言模板（项目术语词典）
     ├── ADR-000-template.md                    # 单份 ADR 模板
     └── ADR-README.template.md                 # ADR 索引模板
 ```
@@ -47,6 +48,7 @@
 | ---- | ---- | ---- |
 | Repo 级高频规则 | `CLAUDE.md` | ≤ 150 行 |
 | **Agent 行为约束** | `.ai-collab/docs/ai-collab-agent-behavior.md` | ≤ 250 行 |
+| **项目术语词典（共享语言）** | `docs/PROJECT_GLOSSARY.md` | ≤ 150 行 |
 | 跨工具入口 | `AGENTS.md` | ≤ 15 行 |
 | Cursor 极简提醒 | `.cursorrules` | ≤ 10 行 |
 | 目录级 runbook | 各目录 `AGENT.md` | ≤ 80 行 |
