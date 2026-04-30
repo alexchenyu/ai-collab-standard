@@ -3,6 +3,7 @@
 
 Lessons:
 - 默认使用中文；除非用户明确要求其它语言。
+- 写代码前先想：假设是否明确？是否最简方案？改动是否最小？成功标准是否可验证？详见 .ai-collab/docs/ai-collab-agent-behavior.md。
 - 看规则先看 CLAUDE.md，看经验先看 lesson_learned.md，看状态先看 docs/PROJECT_STATUS.md，看架构决策先看 docs/ADR/。
 - 子目录有 AGENT.md 时，目录级操作先读 AGENT.md 再看 CLAUDE.md。
 - TODO: 补一条本项目最容易忘、必须长期记住的一句话提醒（保持 ≤ 1 行）

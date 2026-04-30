@@ -161,6 +161,24 @@ check_agent_md_files() {
     done
 }
 
+check_behavior_pointer() {
+    # 检查 CLAUDE.md 是否含有指向 ai-collab-agent-behavior.md 的指针
+    # 这是 .ai-collab 引入"行为约束层"后必须的下游适配点
+    local file="$TARGET_DIR/CLAUDE.md"
+    if [[ ! -f "$file" ]]; then
+        return 0
+    fi
+    if grep -q 'ai-collab-agent-behavior\.md' "$file" 2>/dev/null; then
+        PASSED+=("CLAUDE.md 已指向 ai-collab-agent-behavior.md")
+        printf "  \033[32m[ OK ]\033[0m CLAUDE.md 已指向 ai-collab-agent-behavior.md\n"
+    else
+        local msg="CLAUDE.md 未指向 .ai-collab/docs/ai-collab-agent-behavior.md（行为约束层指针缺失）"
+        SOFT_WARNS+=("$msg")
+        printf "  \033[33m[WARN]\033[0m %s\n" "$msg"
+        printf "        建议在文档索引表里加一行指向该文件，避免 agent 漏掉行为约束。\n"
+    fi
+}
+
 check_duplicate_lines() {
     local -a files=()
     for f in "$TARGET_DIR/CLAUDE.md" "$TARGET_DIR/.cursorrules" "$TARGET_DIR/AGENTS.md" "$TARGET_DIR/lesson_learned.md"; do
@@ -221,6 +239,9 @@ check_lesson_topics "$TARGET_DIR/lesson_learned.md"
 
 section "目录级 AGENT.md / AGENTS.md 检查"
 check_agent_md_files
+
+section "行为约束层指针检查"
+check_behavior_pointer
 
 section "跨文件重复检查（canonical 冲突启发式）"
 check_duplicate_lines

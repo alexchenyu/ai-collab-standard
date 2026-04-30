@@ -5,6 +5,7 @@
 ## 协作约定
 
 - {{LANG_RULE}}
+- **写代码前先想 4 件事**：假设是否明确？是否最简方案？改动是否最小？成功标准是否可验证？详见 `.ai-collab/docs/ai-collab-agent-behavior.md`。
 - `CLAUDE.md` 只保留高频、稳定、直接影响执行的规则；目标长度 ≤ 150 行。
 - **本文件里绝对不放会刷新的数字**（数据规模、端口、实例数、版本号）；这些去 `docs/PROJECT_STATUS.md`。
 - 新踩到的坑、修好的 bug、非显而易见的实现经验：进 `lesson_learned.md` 对应主题，不要塞回本文件。
@@ -16,13 +17,14 @@
 | 想找 | 看这里 |
 | ---- | ---- |
 | Repo 级高频规则 | 本文件 |
+| Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动） | `.ai-collab/docs/ai-collab-agent-behavior.md` |
 | 当前部署状态 / 数据规模 / 端口 | `docs/PROJECT_STATUS.md` |
 | 排障经验 / 踩坑结论 / 实现边界 | `lesson_learned.md` |
 | 架构决策 / 替代方案 | `docs/ADR/README.md` |
 | 跨工具入口 | `AGENTS.md` |
 | Cursor 极简提醒 | `.cursorrules` |
 | 目录级 runbook | 各目录 `AGENT.md` |
-| 治理规范 | `docs/ai-collab-doc-governance.md` |
+| 文档治理规范 | `.ai-collab/docs/ai-collab-doc-governance.md` |
 
 ## 核心目录
 

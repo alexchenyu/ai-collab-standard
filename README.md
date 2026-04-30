@@ -2,6 +2,11 @@
 
 一套用于规范和管理项目中 AI 协作文档（如 `CLAUDE.md`, `.cursorrules`, `AGENT.md`, `lesson_learned.md`, `docs/PROJECT_STATUS.md`, `docs/ADR/`）的通用模板、治理流程和自动化护栏。
 
+包含两个正交维度：
+
+- **信息治理**（`docs/ai-collab-doc-governance.md`）：信息放哪、怎么不膨胀、canonical source 怎么分配。
+- **行为约束**（`docs/ai-collab-agent-behavior.md`）：agent 应该怎么思考与动手 —— 思考前 / 简洁优先 / 精准修改 / 目标驱动。受 [andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills) 启发，按本仓库实战经验扩展。
+
 ## 为什么需要这个
 
 随着 AI 编码助手的普及，项目里往往会堆积大量的规则文件，导致：
@@ -24,8 +29,9 @@
 │   ├── check.sh                     # 治理健康检查（行数/重复/TODO/状态污染）
 │   └── pre-commit.sh                # pre-commit hook，改到协作文档时自动跑 check.sh
 └── docs/
-    ├── ai-collab-doc-governance.md            # 治理规范正文
+    ├── ai-collab-doc-governance.md            # 治理规范正文（信息维度）
     ├── ai-collab-doc-governance.template.md   # 治理规范（可渲染版）
+    ├── ai-collab-agent-behavior.md            # Agent 行为约束（行为维度，canonical）
     ├── CLAUDE.template.md                     # CLAUDE.md 模板
     ├── AGENT.template.md                      # 目录级 AGENT.md 模板
     ├── cursorrules.template                   # .cursorrules 模板
@@ -35,11 +41,12 @@
     └── ADR-README.template.md                 # ADR 索引模板
 ```
 
-## 四类文件的 canonical source 分配
+## canonical source 分配
 
 | 信息类型 | 文件 | 体积上限 |
 | ---- | ---- | ---- |
 | Repo 级高频规则 | `CLAUDE.md` | ≤ 150 行 |
+| **Agent 行为约束** | `.ai-collab/docs/ai-collab-agent-behavior.md` | ≤ 250 行 |
 | 跨工具入口 | `AGENTS.md` | ≤ 15 行 |
 | Cursor 极简提醒 | `.cursorrules` | ≤ 10 行 |
 | 目录级 runbook | 各目录 `AGENT.md` | ≤ 80 行 |
@@ -49,7 +56,7 @@
 
 **硬性规则：一条信息只能有一个 canonical source，其它位置最多留一句"见 X"导航。**
 
-详见 [治理规范](docs/ai-collab-doc-governance.md)。
+详见 [信息治理规范](docs/ai-collab-doc-governance.md) 与 [Agent 行为约束](docs/ai-collab-agent-behavior.md)。
 
 ## 使用指南
 

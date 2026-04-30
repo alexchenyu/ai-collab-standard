@@ -1,6 +1,6 @@
 # `{{DIR_NAME}}/` Agent Guide
 
-补充目录级 runbook。Repo 级规则先看 `{{ROOT_CLAUDE_PATH}}`，这里不重复。
+补充目录级 runbook。Repo 级规则先看 `{{ROOT_CLAUDE_PATH}}`，Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动）见 `.ai-collab/docs/ai-collab-agent-behavior.md`，本文件不重复。
 
 > **什么时候需要这个文件？**
 > 只有当 `{{DIR_NAME}}/` 有**独有的 workflow / 入口 / 坑**，在 repo 级 `CLAUDE.md` 里写不下、也不通用时，才保留本文件。
