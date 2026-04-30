@@ -86,6 +86,8 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . \
 默认**安全模式**，不覆盖已有文件。想用新模板重置：加 `--force`。
 只想看会改什么，不真改：加 `--dry-run`。
 
+**额外行为**：如果项目里已有 `.cursor/skills/`，init 脚本会自动创建 `.claude/skills` symlink 指向它，让 Cursor 和 Claude Code 共用同一份 skills；若 `.gitignore` 把整个 `.claude/` ignore 了，会改写为 `.claude/* + !.claude/skills` 让 symlink 入版本控制。
+
 ### 3. 填写项目特有内容
 
 初始化生成的文件里有 TODO 占位符。先补全：

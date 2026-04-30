@@ -180,6 +180,33 @@ check_behavior_pointer() {
     fi
 }
 
+check_claude_skills_symlink() {
+    # If project has .cursor/skills, .claude/skills should symlink to it
+    # so Claude Code can discover the same skills as Cursor.
+    local cursor_skills="$TARGET_DIR/.cursor/skills"
+    local claude_skills="$TARGET_DIR/.claude/skills"
+    if [[ ! -d "$cursor_skills" ]]; then
+        return 0
+    fi
+    if [[ -L "$claude_skills" ]]; then
+        local current_target
+        current_target="$(readlink "$claude_skills" 2>/dev/null || true)"
+        if [[ "$current_target" == "../.cursor/skills" ]]; then
+            PASSED+=(".claude/skills -> .cursor/skills 已配置")
+            printf "  \033[32m[ OK ]\033[0m .claude/skills -> .cursor/skills\n"
+            return 0
+        fi
+        SOFT_WARNS+=(".claude/skills 是 symlink 但目标不对：$current_target （期望 ../.cursor/skills）")
+        printf "  \033[33m[WARN]\033[0m .claude/skills 目标错误：%s\n" "$current_target"
+    elif [[ -e "$claude_skills" ]]; then
+        SOFT_WARNS+=(".claude/skills 存在但不是 symlink；Cursor / Claude Code 会读到不同的 skill 副本")
+        printf "  \033[33m[WARN]\033[0m .claude/skills 不是 symlink\n"
+    else
+        SOFT_WARNS+=(".cursor/skills 存在但 .claude/skills 缺失；Claude Code 看不到这些 skill。修：bash .ai-collab/scripts/init_ai_collab_docs.sh \"$TARGET_DIR\"")
+        printf "  \033[33m[WARN]\033[0m .claude/skills 缺失（Claude Code 看不到 skills）\n"
+    fi
+}
+
 check_glossary() {
     # 检查 docs/PROJECT_GLOSSARY.md：体积上限 + CLAUDE.md 指针
     local file="$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
@@ -285,6 +312,9 @@ check_behavior_pointer
 
 section "共享语言层（PROJECT_GLOSSARY）检查"
 check_glossary
+
+section "Skills 跨 agent 可见性检查（.cursor/skills 与 .claude/skills）"
+check_claude_skills_symlink
 
 section "跨文件重复检查（canonical 冲突启发式）"
 check_duplicate_lines

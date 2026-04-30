@@ -377,6 +377,87 @@ for dir in "${AGENT_DIRS[@]}"; do
         "{{ROOT_CLAUDE_PATH}}=$claude_path"
 done
 
+link_claude_skills() {
+    # Make .cursor/skills/ also visible to Claude Code by symlinking
+    # .claude/skills -> ../.cursor/skills.
+    # Skip silently if .cursor/skills doesn't exist (project hasn't adopted skills yet).
+    local cursor_skills="$TARGET_DIR/.cursor/skills"
+    local claude_dir="$TARGET_DIR/.claude"
+    local claude_skills="$claude_dir/skills"
+    local gitignore="$TARGET_DIR/.gitignore"
+
+    if [[ ! -d "$cursor_skills" ]]; then
+        return 0
+    fi
+
+    if [[ -e "$claude_skills" || -L "$claude_skills" ]]; then
+        # Already exists -- only act if it's our exact symlink, never overwrite
+        # a real directory or someone else's symlink target without --force.
+        local current_target
+        current_target="$(readlink "$claude_skills" 2>/dev/null || true)"
+        if [[ "$current_target" == "../.cursor/skills" ]]; then
+            note "claude skills symlink already correct: $claude_skills -> ../.cursor/skills"
+        elif (( FORCE == 1 )); then
+            if (( DRY_RUN == 1 )); then
+                note "(dry-run) would replace $claude_skills (current: ${current_target:-<dir>}) with symlink to ../.cursor/skills"
+            else
+                rm -rf "$claude_skills"
+                ln -s "../.cursor/skills" "$claude_skills"
+                note "replaced (--force): $claude_skills -> ../.cursor/skills"
+            fi
+        else
+            note "warning: $claude_skills already exists (target: ${current_target:-<dir>}); use --force to replace"
+        fi
+    else
+        if (( DRY_RUN == 1 )); then
+            note "(dry-run) would create symlink: $claude_skills -> ../.cursor/skills"
+        else
+            mkdir -p "$claude_dir"
+            ln -s "../.cursor/skills" "$claude_skills"
+            note "linked: $claude_skills -> ../.cursor/skills"
+        fi
+    fi
+
+    # Patch .gitignore so the symlink survives clones even when .claude/ is
+    # globally ignored (the common case -- Claude Code writes settings.local.json there).
+    if [[ -f "$gitignore" ]]; then
+        # Already negated? skip.
+        if grep -qE '^!\.claude/skills/?$' "$gitignore" 2>/dev/null; then
+            note "gitignore already whitelists .claude/skills"
+            return 0
+        fi
+        # .claude/ blanket-ignored? add a more granular block.
+        if grep -qE '^\.claude/?\*?$' "$gitignore" 2>/dev/null; then
+            if (( DRY_RUN == 1 )); then
+                note "(dry-run) would relax .claude/ in .gitignore so .claude/skills is tracked"
+            else
+                python3 - "$gitignore" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+lines = path.read_text().splitlines()
+out = []
+for line in lines:
+    stripped = line.strip()
+    if stripped in (".claude/", ".claude"):
+        out.append(".claude/*")
+        out.append("!.claude/skills")
+    else:
+        out.append(line)
+text = "\n".join(out)
+if not text.endswith("\n"):
+    text += "\n"
+path.write_text(text)
+PY
+                note "patched .gitignore: .claude/ -> .claude/* + !.claude/skills"
+            fi
+        fi
+    fi
+}
+
+# Wire .cursor/skills into Claude Code's discovery path
+link_claude_skills
+
 # Optionally install pre-commit hook
 if (( INSTALL_HOOK == 1 )); then
     HOOK_SRC="$SCRIPT_DIR/pre-commit.sh"
