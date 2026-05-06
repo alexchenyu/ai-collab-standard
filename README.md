@@ -67,7 +67,7 @@
 ### 1. 引入 Submodule
 
 ```bash
-git submodule add https://github.com/your-org/ai-collab-standard.git .ai-collab
+git submodule add https://github.com/alexchenyu/ai-collab-standard.git .ai-collab
 ```
 
 本地使用：`git -c protocol.file.allow=always submodule add /path/to/ai-collab-standard .ai-collab`
