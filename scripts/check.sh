@@ -10,6 +10,7 @@
 #   3. 各文件是否残留 TODO 占位符
 #   4. 同一条长字符串是否在多个主文件里同时出现（canonical 冲突启发式）
 #   5. lesson_learned.md 单主题行数上限
+#   6. 本地 scratchpad 是否被 gitignore 忽略
 #
 # 退出码：
 #   0  全部通过
@@ -207,6 +208,124 @@ check_claude_skills_symlink() {
     fi
 }
 
+check_codex_skills_symlink() {
+    # Codex skills compatibility is opt-in. Only check once a project has
+    # created .codex/ or .codex/skills; otherwise default projects stay quiet.
+    local cursor_skills="$TARGET_DIR/.cursor/skills"
+    local codex_dir="$TARGET_DIR/.codex"
+    local codex_skills="$codex_dir/skills"
+
+    if [[ ! -d "$cursor_skills" ]]; then
+        return 0
+    fi
+    if [[ ! -e "$codex_dir" && ! -L "$codex_skills" ]]; then
+        PASSED+=("Codex skills 兼容未启用（默认跳过）")
+        printf "  \033[32m[ OK ]\033[0m Codex skills 兼容未启用（默认跳过）\n"
+        return 0
+    fi
+
+    if [[ -L "$codex_skills" ]]; then
+        local current_target
+        current_target="$(readlink "$codex_skills" 2>/dev/null || true)"
+        if [[ "$current_target" == "../.cursor/skills" ]]; then
+            PASSED+=(".codex/skills -> .cursor/skills 已配置")
+            printf "  \033[32m[ OK ]\033[0m .codex/skills -> .cursor/skills\n"
+            return 0
+        fi
+        SOFT_WARNS+=(".codex/skills 是 symlink 但目标不对：$current_target （期望 ../.cursor/skills）")
+        printf "  \033[33m[WARN]\033[0m .codex/skills 目标错误：%s\n" "$current_target"
+    elif [[ -e "$codex_skills" ]]; then
+        SOFT_WARNS+=(".codex/skills 存在但不是 symlink；Cursor / Codex 可能读到不同的 skill 副本")
+        printf "  \033[33m[WARN]\033[0m .codex/skills 不是 symlink\n"
+    else
+        SOFT_WARNS+=(".codex/ 存在但 .codex/skills 缺失；若要启用 Codex skills，运行：bash .ai-collab/scripts/init_ai_collab_docs.sh \"$TARGET_DIR\" --enable-codex-skills")
+        printf "  \033[33m[WARN]\033[0m .codex/skills 缺失（Codex skills 兼容未完整启用）\n"
+    fi
+}
+
+check_builtin_skills_installed() {
+    local builtin_dir="$TARGET_DIR/.ai-collab/skills"
+    local skill_dir
+    local skill_name
+    local target_skill
+    local missing=0
+
+    if [[ ! -d "$builtin_dir" ]]; then
+        return 0
+    fi
+
+    for skill_dir in "$builtin_dir"/*; do
+        [[ -d "$skill_dir" ]] || continue
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        skill_name="$(basename "$skill_dir")"
+        target_skill="$TARGET_DIR/.cursor/skills/$skill_name/SKILL.md"
+        if [[ -f "$target_skill" ]]; then
+            PASSED+=("内置 skill 已安装：$skill_name")
+            printf "  \033[32m[ OK ]\033[0m 内置 skill 已安装：%s\n" "$skill_name"
+        else
+            local msg="内置 skill 未安装到 .cursor/skills：$skill_name；运行 init_ai_collab_docs.sh 同步"
+            SOFT_WARNS+=("$msg")
+            printf "  \033[33m[WARN]\033[0m %s\n" "$msg"
+            missing=1
+        fi
+    done
+
+    if (( missing == 0 )); then
+        PASSED+=("所有内置 skills 已安装")
+    fi
+}
+
+scratchpad_is_ignored() {
+    local rel="$1"
+    local gitignore="$TARGET_DIR/.gitignore"
+
+    if git -C "$TARGET_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if git -C "$TARGET_DIR" check-ignore -q "$rel" 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    if [[ -f "$gitignore" ]]; then
+        if grep -qxF "$rel" "$gitignore" 2>/dev/null; then
+            return 0
+        fi
+        if [[ "$rel" == .ai-collab/runtime/* ]] && grep -qxF ".ai-collab/runtime/" "$gitignore" 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+check_local_scratchpads() {
+    local found=0
+    local bad=0
+    local rel
+
+    for rel in ".agent-scratchpad.local.md" ".ai-collab/runtime/scratchpad.local.md"; do
+        if [[ ! -e "$TARGET_DIR/$rel" ]]; then
+            continue
+        fi
+        found=1
+        if scratchpad_is_ignored "$rel"; then
+            PASSED+=("$rel 已被 gitignore 忽略")
+            printf "  \033[32m[ OK ]\033[0m %s 已被 gitignore 忽略\n" "$rel"
+        else
+            local msg="$rel 是本地 scratchpad，但未被 gitignore 忽略；它不应进入版本控制或成为 canonical source"
+            SOFT_WARNS+=("$msg")
+            printf "  \033[33m[WARN]\033[0m %s\n" "$msg"
+            bad=1
+        fi
+    done
+
+    if (( found == 0 )); then
+        PASSED+=("未发现本地 scratchpad 文件")
+        printf "  \033[32m[ OK ]\033[0m 未发现本地 scratchpad 文件\n"
+    elif (( bad == 0 )); then
+        PASSED+=("本地 scratchpad 均未进入版本控制范围")
+    fi
+}
+
 check_glossary() {
     # 检查 docs/PROJECT_GLOSSARY.md：体积上限 + CLAUDE.md 指针
     local file="$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
@@ -316,6 +435,15 @@ check_glossary
 section "Skills 跨 agent 可见性检查（.cursor/skills 与 .claude/skills）"
 check_claude_skills_symlink
 
+section "内置 Skills 安装检查（.ai-collab/skills -> .cursor/skills）"
+check_builtin_skills_installed
+
+section "Codex Skills 兼容检查（opt-in）"
+check_codex_skills_symlink
+
+section "本地 Scratchpad 检查"
+check_local_scratchpads
+
 section "跨文件重复检查（canonical 冲突启发式）"
 check_duplicate_lines
 
@@ -373,6 +501,30 @@ suggest_fix() {
                     printed=1
                 fi
                 printf "  • AGENTS.md 超长 → 仅保留入口指引，技术细节进 backend/AGENT.md 等子目录文件。\n"
+                ;;
+            *"本地 scratchpad"*未被*gitignore*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • 本地 scratchpad 未忽略 → 加到 .gitignore：\n"
+                printf "      \033[1mprintf '.agent-scratchpad.local.md\\n.ai-collab/runtime/\\n' >> .gitignore\033[0m\n"
+                ;;
+            *.codex/skills*|*"Codex skills"*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • Codex skills 兼容未完整启用 → 如需启用，运行：\n"
+                printf "      \033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh . --enable-codex-skills\033[0m\n"
+                ;;
+            *"内置 skill 未安装"*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • 内置 skills 未同步 → 运行：\n"
+                printf "      \033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh .\033[0m\n"
                 ;;
             *主题过长*)
                 if (( printed == 0 )); then

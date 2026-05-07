@@ -9,6 +9,8 @@ Usage:
 
 Bootstrap reusable AI collaboration docs into TARGET_DIR.
 By default, existing files are preserved.
+Also adds local scratchpad paths to .gitignore so transient agent state stays untracked.
+Also installs bundled skills from .ai-collab/skills into .cursor/skills.
 
 Options:
   --project-name NAME    Override project name (default: basename TARGET_DIR)
@@ -19,6 +21,7 @@ Options:
   --force                Overwrite existing files
   --dry-run              Print planned actions without writing files
   --install-hook         Install pre-commit hook into .git/hooks (copies pre-commit.sh)
+  --enable-codex-skills  Opt in to .codex/skills -> ../.cursor/skills symlink
   --check                Run the governance health check on TARGET_DIR instead of initializing
   -h, --help             Show this help
 
@@ -28,6 +31,7 @@ Examples:
   bash scripts/init_ai_collab_docs.sh ../my-project --project-name "Acme API" --lang en
   bash scripts/init_ai_collab_docs.sh --check ../my-project
   bash scripts/init_ai_collab_docs.sh ../my-project --install-hook
+  bash scripts/init_ai_collab_docs.sh ../my-project --enable-codex-skills
 EOF
 }
 
@@ -36,6 +40,7 @@ command -v python3 >/dev/null 2>&1 || { echo "python3 is required but not found"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_DIR="$REPO_ROOT/docs"
+BUILTIN_SKILLS_DIR="$REPO_ROOT/skills"
 
 TARGET_DIR=""
 PROJECT_NAME=""
@@ -46,6 +51,7 @@ FORCE=0
 DRY_RUN=0
 INSTALL_HOOK=0
 CHECK_ONLY=0
+ENABLE_CODEX_SKILLS=0
 declare -a AGENT_DIRS=()
 
 require_arg() {
@@ -92,6 +98,10 @@ while (($# > 0)); do
             ;;
         --install-hook)
             INSTALL_HOOK=1
+            shift
+            ;;
+        --enable-codex-skills)
+            ENABLE_CODEX_SKILLS=1
             shift
             ;;
         --check)
@@ -377,6 +387,46 @@ for dir in "${AGENT_DIRS[@]}"; do
         "{{ROOT_CLAUDE_PATH}}=$claude_path"
 done
 
+install_builtin_skills() {
+    if [[ ! -d "$BUILTIN_SKILLS_DIR" ]]; then
+        return 0
+    fi
+
+    local skill_dir
+    local skill_name
+    local src
+    local dst
+
+    for skill_dir in "$BUILTIN_SKILLS_DIR"/*; do
+        [[ -d "$skill_dir" ]] || continue
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+
+        skill_name="$(basename "$skill_dir")"
+        src="$skill_dir"
+        dst="$TARGET_DIR/.cursor/skills/$skill_name"
+
+        if [[ -e "$dst" && "$FORCE" -ne 1 ]]; then
+            note "skip existing bundled skill: $dst"
+            SKIPPED_FILES+=("$dst")
+            continue
+        fi
+
+        if (( DRY_RUN == 1 )); then
+            note "(dry-run) would install bundled skill: $src -> $dst"
+            continue
+        fi
+
+        mkdir -p "$(dirname "$dst")"
+        rm -rf "$dst"
+        cp -R "$src" "$dst"
+        CREATED_FILES+=("$dst")
+        note "installed bundled skill: $dst"
+    done
+}
+
+# Install baseline agent capabilities (e.g. Devin-style task scratchpad).
+install_builtin_skills
+
 link_claude_skills() {
     # Make .cursor/skills/ also visible to Claude Code by symlinking
     # .claude/skills -> ../.cursor/skills.
@@ -469,6 +519,135 @@ PY
 
 # Wire .cursor/skills into Claude Code's discovery path
 link_claude_skills
+
+link_codex_skills() {
+    # Codex support is opt-in. Cursor may scan .cursor/skills, .claude/skills,
+    # .codex/skills, and .agents/skills without dedup, so creating every
+    # compatibility symlink by default can load the same skill multiple times.
+    local cursor_skills="$TARGET_DIR/.cursor/skills"
+    local codex_dir="$TARGET_DIR/.codex"
+    local codex_skills="$codex_dir/skills"
+    local gitignore="$TARGET_DIR/.gitignore"
+
+    if (( ENABLE_CODEX_SKILLS != 1 )); then
+        return 0
+    fi
+
+    if [[ ! -d "$cursor_skills" ]]; then
+        note "warning: --enable-codex-skills requested but .cursor/skills does not exist; skip codex skills link"
+        return 0
+    fi
+
+    if [[ -e "$codex_skills" || -L "$codex_skills" ]]; then
+        local current_target
+        current_target="$(readlink "$codex_skills" 2>/dev/null || true)"
+        if [[ "$current_target" == "../.cursor/skills" ]]; then
+            note "codex skills symlink already correct: $codex_skills -> ../.cursor/skills"
+        elif (( FORCE == 1 )); then
+            if (( DRY_RUN == 1 )); then
+                note "(dry-run) would replace $codex_skills (current: ${current_target:-<dir>}) with symlink to ../.cursor/skills"
+            else
+                rm -rf "$codex_skills"
+                ln -s "../.cursor/skills" "$codex_skills"
+                note "replaced (--force): $codex_skills -> ../.cursor/skills"
+            fi
+        else
+            note "warning: $codex_skills already exists (target: ${current_target:-<dir>}); use --force to replace"
+        fi
+    else
+        if (( DRY_RUN == 1 )); then
+            note "(dry-run) would create symlink: $codex_skills -> ../.cursor/skills"
+        else
+            mkdir -p "$codex_dir"
+            ln -s "../.cursor/skills" "$codex_skills"
+            note "linked: $codex_skills -> ../.cursor/skills"
+        fi
+    fi
+
+    if [[ -f "$gitignore" ]]; then
+        if grep -qE '^!\.codex/skills/?$' "$gitignore" 2>/dev/null; then
+            note "gitignore already whitelists .codex/skills"
+            return 0
+        fi
+        if grep -qE '^\.codex/?\*?$' "$gitignore" 2>/dev/null; then
+            if (( DRY_RUN == 1 )); then
+                note "(dry-run) would relax .codex/ in .gitignore so .codex/skills is tracked"
+            else
+                python3 - "$gitignore" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+lines = path.read_text().splitlines()
+out = []
+for line in lines:
+    stripped = line.strip()
+    if stripped in (".codex/", ".codex"):
+        out.append(".codex/*")
+        out.append("!.codex/skills")
+    else:
+        out.append(line)
+text = "\n".join(out)
+if not text.endswith("\n"):
+    text += "\n"
+path.write_text(text)
+PY
+                note "patched .gitignore: .codex/ -> .codex/* + !.codex/skills"
+            fi
+        fi
+    fi
+}
+
+# Optional Codex discovery path. Do not enable by default due duplicate-scan risk.
+link_codex_skills
+
+ensure_scratchpad_ignored() {
+    local gitignore="$TARGET_DIR/.gitignore"
+    local -a entries=(".agent-scratchpad.local.md" ".ai-collab/runtime/")
+    local -a missing=()
+    local entry
+
+    if [[ -f "$gitignore" ]]; then
+        for entry in "${entries[@]}"; do
+            if ! grep -qxF "$entry" "$gitignore" 2>/dev/null; then
+                missing+=("$entry")
+            fi
+        done
+    else
+        missing=("${entries[@]}")
+    fi
+
+    if (( ${#missing[@]} == 0 )); then
+        note "scratchpad ignore rules already present"
+        return 0
+    fi
+
+    if (( DRY_RUN == 1 )); then
+        note "(dry-run) would add local scratchpad ignore rules to $gitignore: ${missing[*]}"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$gitignore")"
+    python3 - "$gitignore" "${missing[@]}" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+missing = sys.argv[2:]
+text = path.read_text() if path.exists() else ""
+if text and not text.endswith("\n"):
+    text += "\n"
+if text and not text.endswith("\n\n"):
+    text += "\n"
+text += "# AI collab local scratchpads\n"
+text += "\n".join(missing)
+text += "\n"
+path.write_text(text)
+PY
+    note "patched .gitignore with local scratchpad rules: ${missing[*]}"
+}
+
+# Keep transient task memory local-only
+ensure_scratchpad_ignored
 
 # Optionally install pre-commit hook
 if (( INSTALL_HOOK == 1 )); then

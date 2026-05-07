@@ -129,6 +129,45 @@ When a handler / pipeline step grows non-trivial logic, extract a module-level p
 
 This is a Python project. Run scripts with `uv run python ...`, not `python` / `python3`. Add deps with `uv add ...`, not bare `pip install`. Touching system Python or creating ad-hoc venvs is a behavioral violation, not a stylistic one.
 
+### R7. Use scratchpad only as short-term working memory
+
+For multi-step tasks, keeping a lightweight plan / progress log can help preserve context. If persistent working memory is needed, use a local scratchpad such as `.agent-scratchpad.local.md` or `.ai-collab/runtime/scratchpad.local.md`.
+
+- Use the bundled `task-scratchpad` skill when it is available; `init_ai_collab_docs.sh` installs it from `.ai-collab/skills/` into `.cursor/skills/`.
+- Scratchpad content is never canonical source and must not be committed.
+- Keep only current task plan, progress, temporary assumptions, and verification checkpoints there.
+- At task end, migrate durable conclusions through `ai-collab-doc-governance.md`: lessons to `lesson_learned*.md`, decisions to ADR, status to `PROJECT_STATUS.md`; then clear or delete the scratchpad.
+- Never use `.cursorrules` as scratchpad.
+
+### R8. Learn from corrections through the lesson route
+
+When the user corrects you, or you discover a reusable gotcha while fixing your own mistake, do not append it to `.cursorrules`.
+
+- If it is not reusable, just acknowledge it in the current work.
+- If it is reusable, merge it into the matching `lesson_learned*.md` topic.
+- Promote it to `CLAUDE.md` only if it is high-frequency and forgetting it causes high-severity errors.
+
+### R9. Package reusable agent workflows as skills
+
+If a workflow is reusable and needs multiple commands, tools, examples, or resources, create or update a skill / runbook instead of expanding repo rules.
+
+- Use `.cursor/skills/<name>/SKILL.md` for reusable agent capabilities.
+- When you notice a suitable skill opportunity during implementation, create or update the skill in the same turn if it is small and clearly scoped.
+- Ask first if the skill would introduce new dependencies, encode project policy you are unsure about, or require broad restructuring.
+- Keep `CLAUDE.md`, `.cursorrules`, and `AGENTS.md` as entry points, not tool manuals.
+- Prefer a shared `.claude/skills -> ../.cursor/skills` symlink when Claude Code needs the same capabilities.
+- Enable Codex skills only by explicit opt-in (`init_ai_collab_docs.sh --enable-codex-skills`) to avoid duplicate skill scans in Cursor.
+
+### R10. Separate planner, executor, and reviewer roles on risky work
+
+For broad, risky, or ambiguous work, explicitly split the loop even if one agent performs all roles:
+
+1. Planner: clarify assumptions, choose the smallest path, define verification.
+2. Executor: make the scoped changes.
+3. Reviewer: check diffs, tests, docs routing, and whether any lesson should be persisted.
+
+Use subagents only when the split has concrete value, such as parallel exploration, independent review, or isolated experiments.
+
 ---
 
 ## How to Tell This Is Working
@@ -140,6 +179,8 @@ Healthy signals:
 - **Plans precede multi-step work**, with explicit verification at each step.
 - **Code is shorter than your first instinct**, because you simplified before submitting.
 - **Re-runs of expensive pipelines are rare** and always have a stated reason.
+- **Scratchpads disappear after the task**, with durable conclusions routed to the right canonical file.
+- **Reusable workflows become skills proactively**, not longer `.cursorrules` prose or end-of-task suggestions.
 
 Unhealthy signals (the rules are not landing):
 
@@ -148,6 +189,8 @@ Unhealthy signals (the rules are not landing):
 - "Done" is declared without a verification step.
 - Same fact appears in `CLAUDE.md` and `lesson_learned*.md` with slightly different wording.
 - Embeddings / chunks regenerated because nobody checked the existing output.
+- `.cursorrules` contains a task plan, Lessons log, or tool manual.
+- A repeated multi-step workflow keeps getting re-explained in chat instead of being captured as a skill.
 
 ---
 

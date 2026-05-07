@@ -5,7 +5,7 @@
 包含两个正交维度：
 
 - **信息治理**（`docs/ai-collab-doc-governance.md`）：信息放哪、怎么不膨胀、canonical source 怎么分配。
-- **行为约束**（`docs/ai-collab-agent-behavior.md`）：agent 应该怎么思考与动手 —— 思考前 / 简洁优先 / 精准修改 / 目标驱动。受 [andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills) 启发，按本仓库实战经验扩展。
+- **行为约束**（`docs/ai-collab-agent-behavior.md`）：agent 应该怎么思考与动手 —— 思考前 / 简洁优先 / 精准修改 / 目标驱动 / 临时工作记忆 / 自我学习。受 [andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills) 与 [devin.cursorrules](https://github.com/grapeot/devin.cursorrules) 启发，按本仓库实战经验扩展。
 
 ## 为什么需要这个
 
@@ -15,6 +15,8 @@
 - `.cursorrules` 和 `CLAUDE.md` 内容重复
 - 架构决策（ADR）和日常踩坑经验混在一起
 - 具体数字（部署实例、数据规模、端口号）把稳定规则"染色"，每次刷数据都要改规则文件
+- 临时 scratchpad / Lessons 被写进 `.cursorrules`，工具私有文件慢慢变成第二套长期记忆
+- 可复用 agent 工具流程散落在规则长文里，而不是沉淀成 skills / runbook
 - 不同项目之间的文档结构不统一
 
 这套规范提供的是**分层治理 + 路由流程 + 自动化护栏**，而不仅仅是模板。
@@ -28,6 +30,8 @@
 │   ├── init_ai_collab_docs.sh       # 一键初始化/检查脚本（支持 --check --install-hook）
 │   ├── check.sh                     # 治理健康检查（行数/重复/TODO/状态污染）
 │   └── pre-commit.sh                # pre-commit hook，改到协作文档时自动跑 check.sh
+├── skills/
+│   └── task-scratchpad/             # Devin-style 本地短期工作记忆 skill
 └── docs/
     ├── ai-collab-doc-governance.md            # 治理规范正文（信息维度）
     ├── ai-collab-doc-governance.template.md   # 治理规范（可渲染版）
@@ -55,6 +59,8 @@
 | 当前有效经验 | `lesson_learned.md` | ≤ 600 行 |
 | 当前状态快照 | `docs/PROJECT_STATUS.md` | ≤ 120 行 |
 | 架构决策 | `docs/ADR/*.md` | 一决策一文件 |
+| 临时任务工作记忆 | `.agent-scratchpad.local.md` / `.ai-collab/runtime/scratchpad.local.md` | 不进 git |
+| 可复用 agent 能力 | `.cursor/skills/` + `.claude/skills` symlink；`.ai-collab/skills/` 提供内置能力 | 一个 skill 一个目录 |
 
 **硬性规则：一条信息只能有一个 canonical source，其它位置最多留一句"见 X"导航。**
 
@@ -86,7 +92,17 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . \
 默认**安全模式**，不覆盖已有文件。想用新模板重置：加 `--force`。
 只想看会改什么，不真改：加 `--dry-run`。
 
-**额外行为**：如果项目里已有 `.cursor/skills/`，init 脚本会自动创建 `.claude/skills` symlink 指向它，让 Cursor 和 Claude Code 共用同一份 skills；若 `.gitignore` 把整个 `.claude/` ignore 了，会改写为 `.claude/* + !.claude/skills` 让 symlink 入版本控制。
+**额外行为**：init 脚本会把 `.ai-collab/skills/` 下的内置 skills 安装到目标项目 `.cursor/skills/`，默认包含 `task-scratchpad`，用于 Devin-style 本地短期工作记忆。随后脚本会创建 `.claude/skills` symlink 指向 `.cursor/skills`，让 Cursor 和 Claude Code 共用同一份 skills；若 `.gitignore` 把整个 `.claude/` ignore 了，会改写为 `.claude/* + !.claude/skills` 让 symlink 入版本控制。
+
+Codex skills 兼容默认不开启，避免 Cursor 重复扫描多个 skills 路径。需要 Codex 也发现同一份 skills 时显式加：
+
+```bash
+bash .ai-collab/scripts/init_ai_collab_docs.sh . --enable-codex-skills
+```
+
+这会创建 `.codex/skills -> ../.cursor/skills`；`AGENTS.md` 仍作为 Codex 的薄入口，指向 canonical docs。
+
+如果任务需要持久短期计划，使用 `task-scratchpad` skill 管理 `.agent-scratchpad.local.md`。任务结束后只把长期结论归档到 `lesson_learned.md` / ADR / `PROJECT_STATUS.md`，并清空或删除 scratchpad。
 
 ### 3. 填写项目特有内容
 
@@ -126,6 +142,9 @@ check.sh 会报告：
 - `CLAUDE.md / .cursorrules` 是否混入状态快照数字
 - 各文件 TODO 残留
 - `lesson_learned.md` 单主题长度
+- 本地 scratchpad 是否被 `.gitignore` 忽略
+- `.ai-collab/skills/` 内置 skills 是否已安装到 `.cursor/skills/`
+- Codex skills 是否在 opt-in 后正确指向 `.cursor/skills`
 - 主文件间长行重复（canonical 冲突启发式）
 
 退出码：
@@ -144,9 +163,12 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 若要用新模板�
 
 ```
 新条目进来
+ ├── 是"当前任务计划 / 进度 / 临时假设"？── 本地 scratchpad（不进 git）
  ├── 是"现在跑到哪了 / 数据多大 / 哪个端口"类？── PROJECT_STATUS.md
  ├── 是"为什么选 X 而不是 Y"？─────────────── docs/ADR/
  ├── 是"踩过的坑 / 排障结论"？─────────────── lesson_learned.md 对应主题下合并
+ ├── 是"被用户纠正后的可复用经验"？────────── lesson_learned.md，不进 .cursorrules
+ ├── 是"可复用 agent 工具 / 多步工作流"？──── 主动创建 / 更新 .cursor/skills/；目录特有则进 AGENT.md
  ├── 是"稳定规则且全仓库通用"？────────────── CLAUDE.md（优先改已有条目）
  ├── 是"稳定规则但只对某目录有效"？────────── 对应目录 AGENT.md
  ├── 是"Cursor 容易忘的一句话"？────────────  .cursorrules
@@ -155,7 +177,7 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 若要用新模板�
 
 完整流程和合并/消重规则见 [治理规范](docs/ai-collab-doc-governance.md)。
 
-## 最小治理原则（10 条）
+## 最小治理原则（12 条）
 
 1. `CLAUDE.md` 只放高频稳定规则，≤ 150 行。
 2. 根级 `AGENTS.md` 只做跨工具指针，≤ 15 行。
@@ -166,7 +188,9 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 若要用新模板�
 7. ADR 只记录架构决策和提案，不记录日常实现碎片。
 8. 同一条事实只能有一个 canonical source，其它位置只能写一句导航。
 9. 新条目先问"能不能改已有条目"，不能才新增。
-10. 高成本派生成果必须有持久化与失效策略，不能把"重跑"当默认路径。
+10. Scratchpad 只做本地短期工作记忆，不进 git，不当 canonical source。
+11. 发现适合 skill 化的可复用 agent 工具能力时，主动创建 / 更新 skill，不塞进 `.cursorrules`。
+12. 高成本派生成果必须有持久化与失效策略，不能把"重跑"当默认路径。
 
 ## 维护
 

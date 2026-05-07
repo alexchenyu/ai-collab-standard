@@ -17,7 +17,7 @@
 | 想找 | 看这里 |
 | ---- | ---- |
 | Repo 级高频规则 | 本文件 |
-| Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动） | `.ai-collab/docs/ai-collab-agent-behavior.md` |
+| Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动 / scratchpad / skill 化） | `.ai-collab/docs/ai-collab-agent-behavior.md` |
 | 项目术语词典（共享语言） | `docs/PROJECT_GLOSSARY.md` |
 | 当前部署状态 / 数据规模 / 端口 | `docs/PROJECT_STATUS.md` |
 | 排障经验 / 踩坑结论 / 实现边界 | `lesson_learned.md` |
@@ -25,6 +25,7 @@
 | 跨工具入口 | `AGENTS.md` |
 | Cursor 极简提醒 | `.cursorrules` |
 | 目录级 runbook | 各目录 `AGENT.md` |
+| Agent skills（含 `task-scratchpad`） | `.cursor/skills/` |
 | 文档治理规范 | `.ai-collab/docs/ai-collab-doc-governance.md` |
 
 ## 核心目录
