@@ -27,6 +27,7 @@
 .ai-collab/
 ├── README.md                        # 本文件
 ├── scripts/
+│   ├── bootstrap.sh                  # 一行安装/更新入口（curl | bash）
 │   ├── init_ai_collab_docs.sh       # 一键初始化/检查脚本（支持 --check --install-hook）
 │   ├── check.sh                     # 治理健康检查（行数/重复/TODO/状态污染）
 │   └── pre-commit.sh                # pre-commit hook，改到协作文档时自动跑 check.sh
@@ -70,7 +71,38 @@
 
 推荐作为 Git Submodule 引入到业务项目的 `.ai-collab/` 目录下。
 
-### 1. 引入 Submodule
+### 1. 一行安装 / 更新（推荐）
+
+在项目根目录运行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash
+```
+
+这条命令会自动：
+
+- 如果当前目录还不是 git repo，先 `git init`
+- 新项目：添加 `.ai-collab` submodule
+- 老项目：更新 `.ai-collab` 到 `origin/master`
+- 生成 / 更新协作文档入口
+- 安装内置 skills（含 `task-scratchpad`）
+- 安装 pre-commit hook
+- 跑 `check.sh`
+
+常用参数：
+
+```bash
+# 英文项目
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --lang en
+
+# 显式指定项目名和目录级 runbook
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --project-name "My Project" --agent-dir backend --agent-dir frontend
+
+# 启用 Codex skills
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --codex
+```
+
+### 2. 手动引入 Submodule
 
 ```bash
 git submodule add https://github.com/alexchenyu/ai-collab-standard.git .ai-collab
@@ -78,7 +110,7 @@ git submodule add https://github.com/alexchenyu/ai-collab-standard.git .ai-colla
 
 本地使用：`git -c protocol.file.allow=always submodule add /path/to/ai-collab-standard .ai-collab`
 
-### 2. 一键初始化
+### 3. 一键初始化
 
 自动探测目录结构（`backend / frontend / src / scripts` 等），生成对应文档：
 
@@ -104,7 +136,7 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --enable-codex-skills
 
 如果任务需要持久短期计划，使用 `task-scratchpad` skill 管理 `.agent-scratchpad.local.md`。任务结束后只把长期结论归档到 `lesson_learned.md` / ADR / `PROJECT_STATUS.md`，并清空或删除 scratchpad。
 
-### 3. 填写项目特有内容
+### 4. 填写项目特有内容
 
 初始化生成的文件里有 TODO 占位符。先补全：
 
@@ -114,7 +146,7 @@ rg -n 'TODO' .
 
 补完前，**不要把模板当 canonical source**。
 
-### 4. 开启自动化护栏（强烈推荐）
+### 5. 开启自动化护栏（强烈推荐）
 
 ```bash
 # 独立安装 pre-commit hook
@@ -128,7 +160,7 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --install-hook
 效果：任何时候 `git commit` 涉及 `CLAUDE.md / .cursorrules / lesson_learned.md / PROJECT_STATUS.md / AGENT*.md / docs/ADR/*` 改动，都会自动跑 `check.sh`，硬失败会阻断 commit。
 绕过：`git commit --no-verify`（仅在明确必要时）。
 
-### 5. 随时手动跑检查
+### 6. 随时手动跑检查
 
 ```bash
 bash .ai-collab/scripts/check.sh
@@ -152,10 +184,13 @@ check.sh 会报告：
 - `1`：有硬失败（会阻断 commit）
 - `2`：仅软警告（不阻断）
 
-### 6. 持续更新
+### 7. 持续更新
 
 ```bash
-git submodule update --remote                  # 拉最新模板和治理规范
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash
+
+# 或手动更新：
+git -C .ai-collab fetch origin && git -C .ai-collab checkout origin/master
 bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 若要用新模板覆盖（谨慎）
 ```
 
