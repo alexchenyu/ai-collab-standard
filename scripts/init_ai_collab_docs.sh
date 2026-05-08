@@ -15,6 +15,7 @@ Options:
   --agent-dir DIR        Create DIR/AGENT.md from template (repeatable)
   --config-path PATH     Config file path in CLAUDE.md (default: auto-detect or TODO)
   --lang LANG            Default language rule: zh | en (default: zh)
+  --install-hooks        Install local Git hooks for doc governance checks
   --force                Overwrite existing files
   --dry-run              Print planned actions without writing files
   -h, --help             Show this help
@@ -39,6 +40,7 @@ CONFIG_PATH=""
 LANG_OPTION="zh"
 FORCE=0
 DRY_RUN=0
+INSTALL_HOOKS=0
 declare -a AGENT_DIRS=()
 
 require_arg() {
@@ -74,6 +76,10 @@ while (($# > 0)); do
             require_arg "$1" "${2:-}"
             LANG_OPTION="$2"
             shift 2
+            ;;
+        --install-hooks)
+            INSTALL_HOOKS=1
+            shift
             ;;
         --force)
             FORCE=1
@@ -352,12 +358,23 @@ for dir in "${AGENT_DIRS[@]}"; do
         "{{ROOT_CLAUDE_PATH}}=$claude_path"
 done
 
+if [[ "$INSTALL_HOOKS" -eq 1 ]]; then
+    hook_args=("$TARGET_DIR")
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        hook_args+=("--dry-run")
+    fi
+    bash "$SCRIPT_DIR/install_hooks.sh" "${hook_args[@]}"
+fi
+
 note "done"
 if [[ "$DRY_RUN" -eq 1 ]]; then
     note "(dry-run, nothing was written)"
 else
     note "created: ${#CREATED_FILES[@]}"
     note "skipped: ${#SKIPPED_FILES[@]}"
+    if [[ "$INSTALL_HOOKS" -ne 1 ]]; then
+        note "next: bash .ai-collab/scripts/install_hooks.sh .  # install commit-time governance checks"
+    fi
     note "next: rg -n '\{\{[A-Z0-9_]+\}\}' \"$TARGET_DIR\"  # verify remaining placeholders"
     note "next: rg -n 'TODO' \"$TARGET_DIR\"  # fill in project-specific content"
 fi

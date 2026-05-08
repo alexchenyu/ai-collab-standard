@@ -15,6 +15,8 @@
 ## 目录结构
 
 - `scripts/init_ai_collab_docs.sh`: 一键初始化/更新脚本
+- `scripts/install_hooks.sh`: 安装本地 Git hooks，提交前检查协作文档是否跑偏
+- `scripts/check_ai_collab_docs.py`: hook 调用的协作文档治理检查
 - `docs/`: 存放所有模板文件和治理说明文档
 
 ## 使用指南
@@ -37,10 +39,12 @@ git submodule add https://github.com/your-org/ai-collab-standard.git .ai-collab
 ```bash
 bash .ai-collab/scripts/init_ai_collab_docs.sh . \
     --project-name "My Project" \
-    --lang zh
+    --lang zh \
+    --install-hooks
 ```
 
 > **提示**：脚本默认是**安全模式**，不会覆盖你项目中已有的同名文件。如果想强制覆盖（比如想用最新的模板重置框架），可以加上 `--force` 参数。
+> `--install-hooks` 会安装本地 `pre-commit` 检查：当 `.cursorrules` 被提交且明显过长时，会阻止提交并提示先分流到 `CLAUDE.md`、`lesson_learned.md` 或 ADR。它负责拦截失控增长，不做语义自动改写。
 
 ### 第三步：填写项目特有内容
 
@@ -52,6 +56,12 @@ rg -n 'TODO' .
 ```
 
 在补完这些 `TODO` 之前，不要把模板文件当作真正的 canonical source。
+
+如果初始化时没有加 `--install-hooks`，可以之后单独安装：
+
+```bash
+bash .ai-collab/scripts/install_hooks.sh .
+```
 
 ### 第四步：日常更新与维护
 
