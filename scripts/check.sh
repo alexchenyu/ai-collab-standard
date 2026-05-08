@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# AI 协作文档治理健康检查
+# AI 协作文档治理健康检查（新架构：AGENTS.md canonical / Cursor MDC / 子目录 AGENTS.md）
 # 用法：
 #   bash .ai-collab/scripts/check.sh [TARGET_DIR]
 #   默认 TARGET_DIR 是当前目录的 git 仓库根
 #
 # 检查项：
-#   1. 四大主文件行数 vs 目标上限（软警告 / 硬失败）
-#   2. CLAUDE.md / .cursorrules 是否混入了"状态快照类数字"
+#   1. 主文件行数 / 字节数 vs 目标上限（软警告 / 硬失败）
+#   2. AGENTS.md 是否混入了"状态快照类数字"
 #   3. 各文件是否残留 TODO 占位符
 #   4. 同一条长字符串是否在多个主文件里同时出现（canonical 冲突启发式）
 #   5. lesson_learned.md 单主题行数上限
 #   6. 本地 scratchpad 是否被 gitignore 忽略
+#   7. .cursor/rules/ 至少有一个 alwaysApply mdc 指向 AGENTS.md
+#   8. 子目录 runbook 用 AGENTS.md（不是过时的 AGENT.md 单数）
+#   9. AGENTS.md 总字节（含递归子目录）≤ Codex project_doc_max_bytes (32 KiB)
+#   10. 历史遗留：.cursorrules 还在？提示迁移
 #
 # 退出码：
 #   0  全部通过
@@ -21,15 +25,17 @@ set -uo pipefail
 TARGET_DIR="${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
-CLAUDE_MAX=150
-CURSORRULES_MAX=10
-AGENTS_MAX=15
+# New layout limits (AGENTS.md is canonical, CLAUDE.md is stub).
+AGENTS_MAX=200                # was 15 (thin pointer); now canonical
+CLAUDE_MAX=30                 # was 150 (canonical); now Claude Code stub
+CURSOR_MDC_MAX=60             # .cursor/rules/00-core.mdc; alwaysApply token budget
 LESSON_SOFT=350
 LESSON_HARD=600
 PROJECT_STATUS_MAX=120
 PROJECT_GLOSSARY_MAX=150
-AGENT_MD_SOFT=80
+SUBDIR_AGENTS_SOFT=80
 LESSON_TOPIC_MAX=80
+CODEX_PROJECT_DOC_MAX_BYTES=32768   # default Codex project_doc_max_bytes (32 KiB)
 
 declare -a HARD_FAILS=()
 declare -a SOFT_WARNS=()
@@ -140,44 +146,154 @@ check_lesson_topics() {
     fi
 }
 
-check_agent_md_files() {
-    local -a files=()
+check_subdir_agents_files() {
+    # Recursive AGENTS.md is the cross-tool standard (Codex + Cursor walk from
+    # git root down). Old-style singular AGENT.md is no longer auto-loaded.
+    local -a agents_files=()
+    local -a legacy_agent_files=()
     while IFS= read -r f; do
-        files+=("$f")
+        agents_files+=("$f")
     done < <(find "$TARGET_DIR" \
         \( -path '*/node_modules' -o -path '*/.git' -o -path '*/venv' -o -path '*/.venv' -o -path '*/docs/archive*' -o -path '*/.ai-collab*' \) -prune -o \
-        \( -name 'AGENT.md' -o -name 'AGENTS.md' \) -type f -print 2>/dev/null)
-    if (( ${#files[@]} == 0 )); then
-        PASSED+=("未发现目录级 AGENT.md / AGENTS.md")
-        printf "  \033[32m[ OK ]\033[0m 未发现目录级 AGENT.md / AGENTS.md\n"
+        -name 'AGENTS.md' -type f -print 2>/dev/null)
+    while IFS= read -r f; do
+        legacy_agent_files+=("$f")
+    done < <(find "$TARGET_DIR" \
+        \( -path '*/node_modules' -o -path '*/.git' -o -path '*/venv' -o -path '*/.venv' -o -path '*/docs/archive*' -o -path '*/.ai-collab*' \) -prune -o \
+        -name 'AGENT.md' -type f -print 2>/dev/null)
+
+    if (( ${#agents_files[@]} == 0 && ${#legacy_agent_files[@]} == 0 )); then
+        PASSED+=("未发现 AGENTS.md / AGENT.md 文件")
+        printf "  \033[32m[ OK ]\033[0m 未发现 AGENTS.md / AGENT.md 文件\n"
         return 0
     fi
-    for f in "${files[@]}"; do
-        # 根 AGENTS.md 用更严格的上限
-        if [[ "$f" == "$TARGET_DIR/AGENTS.md" ]]; then
-            check_lines "$f" "$AGENTS_MAX" "根 AGENTS.md"
-        else
-            check_lines "$f" "$AGENT_MD_SOFT" "${f#$TARGET_DIR/}" 0
-            check_todo_residue "$f" "${f#$TARGET_DIR/}" 0
-        fi
+
+    # Sub-directory AGENTS.md size cap (root has its own canonical cap, applied elsewhere).
+    for f in "${agents_files[@]}"; do
+        [[ "$f" == "$TARGET_DIR/AGENTS.md" ]] && continue
+        check_lines "$f" "$SUBDIR_AGENTS_SOFT" "${f#$TARGET_DIR/}" 0
+        check_todo_residue "$f" "${f#$TARGET_DIR/}" 0
+    done
+
+    # Legacy AGENT.md (singular) — Codex/Cursor will not auto-load it.
+    for f in "${legacy_agent_files[@]}"; do
+        local msg="${f#$TARGET_DIR/} 是过时的 AGENT.md (单数)；Codex/Cursor 不会递归自动加载，请重命名为同目录 AGENTS.md (复数)。修复：bash .ai-collab/scripts/init_ai_collab_docs.sh \"$TARGET_DIR\" --migrate-legacy"
+        SOFT_WARNS+=("$msg")
+        printf "  \033[33m[WARN]\033[0m %s\n" "$msg"
     done
 }
 
 check_behavior_pointer() {
-    # 检查 CLAUDE.md 是否含有指向 ai-collab-agent-behavior.md 的指针
-    # 这是 .ai-collab 引入"行为约束层"后必须的下游适配点
+    # AGENTS.md (canonical) and the Cursor mdc rule should both reference the
+    # behavior layer; otherwise an agent that only loads one will miss it.
+    local agents="$TARGET_DIR/AGENTS.md"
+    local mdc="$TARGET_DIR/.cursor/rules/00-core.mdc"
+    local missing=0
+
+    if [[ -f "$agents" ]]; then
+        if grep -q 'ai-collab-agent-behavior\.md' "$agents" 2>/dev/null; then
+            PASSED+=("AGENTS.md 已指向 ai-collab-agent-behavior.md")
+            printf "  \033[32m[ OK ]\033[0m AGENTS.md 已指向 ai-collab-agent-behavior.md\n"
+        else
+            SOFT_WARNS+=("AGENTS.md 未指向 .ai-collab/docs/ai-collab-agent-behavior.md（行为约束层指针缺失）")
+            printf "  \033[33m[WARN]\033[0m AGENTS.md 未指向 ai-collab-agent-behavior.md\n"
+            missing=1
+        fi
+    fi
+
+    if [[ -f "$mdc" ]]; then
+        if grep -q 'ai-collab-agent-behavior\.md' "$mdc" 2>/dev/null; then
+            PASSED+=(".cursor/rules/00-core.mdc 已指向 ai-collab-agent-behavior.md")
+            printf "  \033[32m[ OK ]\033[0m .cursor/rules/00-core.mdc 已指向 ai-collab-agent-behavior.md\n"
+        else
+            SOFT_WARNS+=(".cursor/rules/00-core.mdc 未指向 ai-collab-agent-behavior.md")
+            printf "  \033[33m[WARN]\033[0m .cursor/rules/00-core.mdc 未指向 ai-collab-agent-behavior.md\n"
+            missing=1
+        fi
+    fi
+}
+
+check_cursor_rules_mdc() {
+    # Modern Cursor reads .cursor/rules/*.mdc; .cursorrules is silently
+    # ignored in Agent mode. We require at least one alwaysApply mdc rule.
+    local rules_dir="$TARGET_DIR/.cursor/rules"
+    if [[ ! -d "$rules_dir" ]]; then
+        SOFT_WARNS+=(".cursor/rules/ 目录不存在；Cursor Agent 模式下没有任何项目规则被注入。修：bash .ai-collab/scripts/init_ai_collab_docs.sh \"$TARGET_DIR\"")
+        printf "  \033[33m[WARN]\033[0m .cursor/rules/ 目录不存在（Cursor Agent 模式无规则）\n"
+        return 0
+    fi
+    local always_apply_count
+    always_apply_count=$(grep -lE '^alwaysApply:[[:space:]]*true' "$rules_dir"/*.mdc 2>/dev/null | wc -l | tr -d ' ')
+    if (( always_apply_count == 0 )); then
+        SOFT_WARNS+=(".cursor/rules/ 没有 alwaysApply: true 的 mdc 文件；Cursor 永远不会自动注入项目规则")
+        printf "  \033[33m[WARN]\033[0m .cursor/rules/ 没有 alwaysApply: true 的规则\n"
+    else
+        PASSED+=(".cursor/rules/ 含 $always_apply_count 个 alwaysApply 规则")
+        printf "  \033[32m[ OK ]\033[0m .cursor/rules/ 含 %d 个 alwaysApply 规则\n" "$always_apply_count"
+    fi
+    # Soft cap on the core mdc size — alwaysApply rules eat token budget.
+    local core="$rules_dir/00-core.mdc"
+    [[ -f "$core" ]] && check_lines "$core" "$CURSOR_MDC_MAX" ".cursor/rules/00-core.mdc" 0
+}
+
+check_legacy_cursorrules() {
+    # .cursorrules is silently ignored in Cursor Agent mode (deprecated).
+    # If the file still exists with substantive content, suggest migration.
+    local file="$TARGET_DIR/.cursorrules"
+    if [[ ! -f "$file" ]]; then
+        PASSED+=("未发现旧 .cursorrules（已迁移到 .cursor/rules/*.mdc）")
+        printf "  \033[32m[ OK ]\033[0m 未发现旧 .cursorrules\n"
+        return 0
+    fi
+    local lines
+    lines=$(wc -l < "$file" | tr -d ' ')
+    SOFT_WARNS+=(".cursorrules 仍存在 ($lines 行)；Cursor Agent 模式会静默忽略它。迁移：把内容拷到 .cursor/rules/00-core.mdc，然后删除 .cursorrules 或重命名为 .cursorrules.legacy.bak")
+    printf "  \033[33m[WARN]\033[0m .cursorrules 仍存在 (%d 行)，Agent 模式不读取\n" "$lines"
+}
+
+check_codex_budget() {
+    # Codex stops loading AGENTS.md once accumulated bytes hit
+    # project_doc_max_bytes (default 32 KiB). Sum the root + recursive subdir
+    # files we actually generate; warn if total > 24 KiB (75% headroom).
+    local total=0 file size warn_threshold
+    warn_threshold=$(( CODEX_PROJECT_DOC_MAX_BYTES * 3 / 4 ))
+    while IFS= read -r file; do
+        size=$(wc -c < "$file" 2>/dev/null | tr -d ' ')
+        total=$(( total + size ))
+    done < <(find "$TARGET_DIR" \
+        \( -path '*/node_modules' -o -path '*/.git' -o -path '*/venv' -o -path '*/.venv' -o -path '*/.ai-collab*' \) -prune -o \
+        -name 'AGENTS.md' -type f -print 2>/dev/null)
+    if (( total == 0 )); then
+        return 0
+    fi
+    local human_total human_max
+    human_total=$(( total / 1024 ))
+    human_max=$(( CODEX_PROJECT_DOC_MAX_BYTES / 1024 ))
+    if (( total > CODEX_PROJECT_DOC_MAX_BYTES )); then
+        HARD_FAILS+=("AGENTS.md 总字节 ${total}B (~${human_total}KiB) > Codex project_doc_max_bytes ${CODEX_PROJECT_DOC_MAX_BYTES}B (~${human_max}KiB); 深层文件会被截断")
+        printf "  \033[31m[FAIL]\033[0m AGENTS.md 总字节超 Codex 预算: %d B > %d B\n" "$total" "$CODEX_PROJECT_DOC_MAX_BYTES"
+    elif (( total > warn_threshold )); then
+        SOFT_WARNS+=("AGENTS.md 总字节 ${total}B 接近 Codex 预算 ${CODEX_PROJECT_DOC_MAX_BYTES}B；考虑把细节挪到 lesson_learned.md / ADR")
+        printf "  \033[33m[WARN]\033[0m AGENTS.md 总字节 %d B 接近 Codex 预算 %d B\n" "$total" "$CODEX_PROJECT_DOC_MAX_BYTES"
+    else
+        PASSED+=("AGENTS.md 总字节 ${total}B 在 Codex 预算 ${CODEX_PROJECT_DOC_MAX_BYTES}B 内")
+        printf "  \033[32m[ OK ]\033[0m AGENTS.md 总字节 %d B / %d B (Codex 预算)\n" "$total" "$CODEX_PROJECT_DOC_MAX_BYTES"
+    fi
+}
+
+check_claude_stub() {
+    # CLAUDE.md should now be a thin stub pointing at AGENTS.md, not a 150-line
+    # canonical file. If it still looks substantive, warn.
     local file="$TARGET_DIR/CLAUDE.md"
     if [[ ! -f "$file" ]]; then
         return 0
     fi
-    if grep -q 'ai-collab-agent-behavior\.md' "$file" 2>/dev/null; then
-        PASSED+=("CLAUDE.md 已指向 ai-collab-agent-behavior.md")
-        printf "  \033[32m[ OK ]\033[0m CLAUDE.md 已指向 ai-collab-agent-behavior.md\n"
+    if grep -q 'AGENTS\.md' "$file" 2>/dev/null; then
+        PASSED+=("CLAUDE.md 已指向 AGENTS.md (canonical)")
+        printf "  \033[32m[ OK ]\033[0m CLAUDE.md 已指向 AGENTS.md (canonical)\n"
     else
-        local msg="CLAUDE.md 未指向 .ai-collab/docs/ai-collab-agent-behavior.md（行为约束层指针缺失）"
-        SOFT_WARNS+=("$msg")
-        printf "  \033[33m[WARN]\033[0m %s\n" "$msg"
-        printf "        建议在文档索引表里加一行指向该文件，避免 agent 漏掉行为约束。\n"
+        SOFT_WARNS+=("CLAUDE.md 未提及 AGENTS.md；Claude Code 用户会以为 CLAUDE.md 是 canonical")
+        printf "  \033[33m[WARN]\033[0m CLAUDE.md 未提及 AGENTS.md\n"
     fi
 }
 
@@ -383,7 +499,7 @@ check_glossary() {
 
 check_duplicate_lines() {
     local -a files=()
-    for f in "$TARGET_DIR/CLAUDE.md" "$TARGET_DIR/.cursorrules" "$TARGET_DIR/AGENTS.md" "$TARGET_DIR/lesson_learned.md"; do
+    for f in "$TARGET_DIR/AGENTS.md" "$TARGET_DIR/CLAUDE.md" "$TARGET_DIR/.cursor/rules/00-core.mdc" "$TARGET_DIR/lesson_learned.md"; do
         [[ -f "$f" ]] && files+=("$f")
     done
     if (( ${#files[@]} < 2 )); then
@@ -410,13 +526,12 @@ check_duplicate_lines() {
 printf "\033[1;36mAI 协作文档治理健康检查\033[0m\n"
 printf "目标目录：%s\n" "$TARGET_DIR"
 
-section "体积检查"
-check_lines "$TARGET_DIR/CLAUDE.md" "$CLAUDE_MAX" "CLAUDE.md"
-check_lines "$TARGET_DIR/.cursorrules" "$CURSORRULES_MAX" ".cursorrules"
-check_lines "$TARGET_DIR/AGENTS.md" "$AGENTS_MAX" "AGENTS.md"
+section "体积检查（新架构：AGENTS.md canonical / CLAUDE.md stub / Cursor MDC）"
+check_lines "$TARGET_DIR/AGENTS.md" "$AGENTS_MAX" "AGENTS.md (canonical)"
+check_lines "$TARGET_DIR/CLAUDE.md" "$CLAUDE_MAX" "CLAUDE.md (stub)" 0
+check_lines "$TARGET_DIR/.cursor/rules/00-core.mdc" "$CURSOR_MDC_MAX" ".cursor/rules/00-core.mdc" 0
 check_lines "$TARGET_DIR/lesson_learned.md" "$LESSON_HARD" "lesson_learned.md (硬上限)"
 check_lines "$TARGET_DIR/lesson_learned.md" "$LESSON_SOFT" "lesson_learned.md (软建议)" 0
-# 拆出来的 lesson_learned_<topic>.md 也受治理：每个 ≤ LESSON_SOFT
 shopt -s nullglob
 for f in "$TARGET_DIR"/lesson_learned_*.md; do
     label="${f#$TARGET_DIR/}"
@@ -426,23 +541,35 @@ done
 shopt -u nullglob
 check_lines "$TARGET_DIR/docs/PROJECT_STATUS.md" "$PROJECT_STATUS_MAX" "docs/PROJECT_STATUS.md" 0
 
-section "状态快照污染检查（CLAUDE.md / .cursorrules 不应混入数字）"
+section "状态快照污染检查（AGENTS.md / CLAUDE.md 不应混入数字）"
+check_no_snapshot_numbers "$TARGET_DIR/AGENTS.md" "AGENTS.md"
 check_no_snapshot_numbers "$TARGET_DIR/CLAUDE.md" "CLAUDE.md"
-check_no_snapshot_numbers "$TARGET_DIR/.cursorrules" ".cursorrules"
 
 section "TODO 残留检查"
+check_todo_residue "$TARGET_DIR/AGENTS.md" "AGENTS.md" 0
 check_todo_residue "$TARGET_DIR/CLAUDE.md" "CLAUDE.md" 0
-check_todo_residue "$TARGET_DIR/.cursorrules" ".cursorrules" 0
 check_todo_residue "$TARGET_DIR/lesson_learned.md" "lesson_learned.md" 0
 check_todo_residue "$TARGET_DIR/docs/PROJECT_STATUS.md" "docs/PROJECT_STATUS.md" 0
 
 section "lesson_learned.md 主题长度检查"
 check_lesson_topics "$TARGET_DIR/lesson_learned.md"
 
-section "目录级 AGENT.md / AGENTS.md 检查"
-check_agent_md_files
+section "子目录 AGENTS.md / 旧 AGENT.md 迁移检查"
+check_subdir_agents_files
 
-section "行为约束层指针检查"
+section "Cursor 现代规则检查（.cursor/rules/*.mdc）"
+check_cursor_rules_mdc
+
+section "旧 .cursorrules 残留检查（Cursor Agent 模式不读取）"
+check_legacy_cursorrules
+
+section "Codex 32 KiB 总预算检查（递归 AGENTS.md 字节累加）"
+check_codex_budget
+
+section "CLAUDE.md 桩文件检查（应指向 AGENTS.md）"
+check_claude_stub
+
+section "行为约束层指针检查（AGENTS.md + Cursor MDC 都应指）"
 check_behavior_pointer
 
 section "共享语言层（PROJECT_GLOSSARY）检查"
@@ -497,26 +624,49 @@ suggest_fix() {
                 file=$(printf '%s' "$msg" | grep -oE 'lesson_learned_[^ )]+\.md' | head -1)
                 printf "  • %s 超长 → 按 ### 子主题手动二次拆分到 lesson_learned_<sub>.md，并在原文件留导航。\n" "$file"
                 ;;
-            *.cursorrules*超长*)
+            *.cursorrules*仍存在*|*.cursorrules*Agent\ 模式*)
                 if (( printed == 0 )); then
                     printf "\n\033[36m[修复建议]\033[0m\n"
                     printed=1
                 fi
-                printf "  • .cursorrules 超长 → 这是极简提醒层，把详情挪到 lesson_learned.md 对应主题，留下一句话导航。\n"
+                printf "  • .cursorrules 仍存在 → Cursor Agent 模式不读取它。迁移：\n"
+                printf "      把内容拷到 \033[1m.cursor/rules/00-core.mdc\033[0m，然后 \033[1mrm .cursorrules\033[0m\n"
+                printf "      或自动迁移：\033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh . --migrate-legacy\033[0m\n"
                 ;;
             *CLAUDE.md*超长*)
                 if (( printed == 0 )); then
                     printf "\n\033[36m[修复建议]\033[0m\n"
                     printed=1
                 fi
-                printf "  • CLAUDE.md 超长 → 把不稳定/状态类内容迁到 docs/PROJECT_STATUS.md，深细节迁到 lesson_learned.md。\n"
+                printf "  • CLAUDE.md 超长 → 现在是 Claude Code 桩文件，只放 ≤30 行内容。\n"
+                printf "      把项目规则迁到 \033[1mAGENTS.md\033[0m（canonical），状态数字到 PROJECT_STATUS.md，深细节到 lesson_learned.md。\n"
                 ;;
-            *AGENTS.md*超长*)
+            *AGENTS.md*超长*|*AGENTS.md*总字节超*)
                 if (( printed == 0 )); then
                     printf "\n\033[36m[修复建议]\033[0m\n"
                     printed=1
                 fi
-                printf "  • AGENTS.md 超长 → 仅保留入口指引，技术细节进 backend/AGENT.md 等子目录文件。\n"
+                printf "  • AGENTS.md 超长/超预算 → 把可拆走的细节迁出：\n"
+                printf "      技术细节 → 子目录 AGENTS.md（Codex/Cursor 会按目录递归加载）\n"
+                printf "      经验/排障 → lesson_learned.md\n"
+                printf "      架构决策 → docs/ADR/\n"
+                printf "      状态数字 → docs/PROJECT_STATUS.md\n"
+                ;;
+            *AGENT.md*单数*|*过时的\ AGENT.md*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • 子目录 AGENT.md (单数) → 重命名为 AGENTS.md (复数)。一键迁移：\n"
+                printf "      \033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh . --migrate-legacy\033[0m\n"
+                ;;
+            *.cursor/rules/*没有*alwaysApply*|*.cursor/rules/*目录不存在*)
+                if (( printed == 0 )); then
+                    printf "\n\033[36m[修复建议]\033[0m\n"
+                    printed=1
+                fi
+                printf "  • Cursor Agent 模式无规则注入 → 生成 .cursor/rules/00-core.mdc：\n"
+                printf "      \033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh .\033[0m\n"
                 ;;
             *"本地 scratchpad"*未被*gitignore*)
                 if (( printed == 0 )); then

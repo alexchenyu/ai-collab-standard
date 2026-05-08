@@ -20,20 +20,24 @@ Usage:
   bash scripts/init_ai_collab_docs.sh --check [TARGET_DIR]
 
 Bootstrap reusable AI collaboration docs into TARGET_DIR.
-By default, existing files are preserved.
-Also adds local scratchpad paths to .gitignore so transient agent state stays untracked.
-Also installs bundled skills from .ai-collab/skills into .cursor/skills.
+Existing files are preserved by default. Generates the modern layout
+(AGENTS.md as canonical, CLAUDE.md as Claude-Code stub, .cursor/rules/00-core.mdc
+as Cursor always-apply pointer); subdirectories use AGENTS.md (recursive Codex/Cursor
+discovery). Adds .gitignore rules for local scratchpad and installs bundled skills
+from .ai-collab/skills into .cursor/skills.
 
 Options:
   --project-name NAME    Override project name (default: basename TARGET_DIR)
-  --summary TEXT         One-line project summary for CLAUDE.md
-  --agent-dir DIR        Create DIR/AGENT.md from template (repeatable)
-  --config-path PATH     Config file path in CLAUDE.md (default: auto-detect or TODO)
+  --summary TEXT         One-line project summary for AGENTS.md
+  --agent-dir DIR        Create DIR/AGENTS.md from template (repeatable)
+  --config-path PATH     Config file path in AGENTS.md (default: auto-detect or TODO)
   --lang LANG            Default language rule: zh | en (default: zh)
   --force                Overwrite existing files
   --dry-run              Print planned actions without writing files
   --install-hook         Install pre-commit hook into .git/hooks (copies pre-commit.sh)
   --enable-codex-skills  Opt in to .codex/skills -> ../.cursor/skills symlink
+  --migrate-legacy       Detect and migrate legacy CLAUDE.md-canonical / AGENT.md /
+                         .cursorrules layout into the new AGENTS.md-canonical layout
   --check                Run the governance health check on TARGET_DIR instead of initializing
   -h, --help             Show this help
 
@@ -44,6 +48,7 @@ Examples:
   bash scripts/init_ai_collab_docs.sh --check ../my-project
   bash scripts/init_ai_collab_docs.sh ../my-project --install-hook
   bash scripts/init_ai_collab_docs.sh ../my-project --enable-codex-skills
+  bash scripts/init_ai_collab_docs.sh ../my-project --migrate-legacy
 EOF
 }
 
@@ -64,6 +69,7 @@ DRY_RUN=0
 INSTALL_HOOK=0
 CHECK_ONLY=0
 ENABLE_CODEX_SKILLS=0
+MIGRATE_LEGACY=0
 declare -a AGENT_DIRS=()
 
 require_arg() {
@@ -114,6 +120,10 @@ while (($# > 0)); do
             ;;
         --enable-codex-skills)
             ENABLE_CODEX_SKILLS=1
+            shift
+            ;;
+        --migrate-legacy)
+            MIGRATE_LEGACY=1
             shift
             ;;
         --check)
@@ -330,37 +340,20 @@ write_text() {
     note "wrote: $dst"
 }
 
-relative_claude_path() {
-    python3 - "$1" <<'PY'
+relative_root_path() {
+    # Compute the relative path from a subdirectory back to the repo root file
+    # named $2 (e.g. "AGENTS.md"). Used by subdirectory AGENTS.md templates.
+    python3 - "$1" "$2" <<'PY'
 from pathlib import PurePosixPath
 import sys
 
+target_filename = sys.argv[2]
 parts = [p for p in PurePosixPath(sys.argv[1]).parts if p not in ("", ".")]
 if not parts:
-    print("CLAUDE.md")
+    print(target_filename)
 else:
-    print("/".join([".."] * len(parts) + ["CLAUDE.md"]))
+    print("/".join([".."] * len(parts) + [target_filename]))
 PY
-}
-
-build_agents_md() {
-    local dst="$1"
-    local text="# Agent Entry Points"$'\n'
-    text+="- Repo 级规则：\`CLAUDE.md\`"$'\n'
-
-    local dir
-    for dir in "${AGENT_DIRS[@]}"; do
-        text+="- \`$dir/\` 局部 runbook：\`$dir/AGENT.md\`"$'\n'
-    done
-
-    text+="- 当前有效经验：\`lesson_learned.md\`"$'\n'
-    text+="- 架构决策索引：\`docs/ADR/README.md\`"$'\n'
-
-    write_text "$dst" "$text"
-
-    if [[ "${#AGENT_DIRS[@]}" -gt 6 ]]; then
-        note "warning: ${#AGENT_DIRS[@]} agent dirs listed in AGENTS.md; consider consolidating to keep it scannable"
-    fi
 }
 
 if [[ "${#AGENT_DIRS[@]}" -eq 0 ]]; then
@@ -403,19 +396,81 @@ else
     note "agent dirs: none auto-detected; root docs only"
 fi
 
+# Optional legacy migration: detect old layout and clean it up before rendering.
+maybe_migrate_legacy() {
+    if (( MIGRATE_LEGACY != 1 )); then
+        return 0
+    fi
+
+    note "migration: scanning legacy artifacts in $TARGET_DIR"
+
+    # 1. .cursorrules is silently ignored in Cursor Agent mode now; migrate to
+    #    .cursor/rules/00-core.mdc. We do not delete the old file (user may want
+    #    to copy content manually); we just rename it to .cursorrules.legacy.bak
+    #    so it stops being loaded and FORCE-overwrite of the new layout proceeds.
+    if [[ -f "$TARGET_DIR/.cursorrules" && ! -f "$TARGET_DIR/.cursorrules.legacy.bak" ]]; then
+        if (( DRY_RUN == 1 )); then
+            note "(dry-run) would archive .cursorrules -> .cursorrules.legacy.bak"
+        else
+            mv "$TARGET_DIR/.cursorrules" "$TARGET_DIR/.cursorrules.legacy.bak"
+            note "migration: archived .cursorrules -> .cursorrules.legacy.bak (review and copy any content into .cursor/rules/00-core.mdc, then delete)"
+        fi
+    fi
+
+    # 2. Subdirectory AGENT.md (singular) is not auto-loaded by Codex/Cursor;
+    #    rename to AGENTS.md (plural) which is the recursive-discovery standard.
+    while IFS= read -r f; do
+        local subdir
+        subdir="$(dirname "$f")"
+        if [[ -f "$subdir/AGENTS.md" ]]; then
+            note "migration: skip $f (target $subdir/AGENTS.md already exists)"
+            continue
+        fi
+        if (( DRY_RUN == 1 )); then
+            note "(dry-run) would rename $f -> $subdir/AGENTS.md"
+        else
+            mv "$f" "$subdir/AGENTS.md"
+            note "migration: renamed $f -> $subdir/AGENTS.md"
+        fi
+    done < <(find "$TARGET_DIR" \
+        \( -path '*/node_modules' -o -path '*/.git' -o -path '*/.venv' -o -path '*/.ai-collab*' \) -prune -o \
+        -name 'AGENT.md' -type f -print 2>/dev/null)
+
+    # 3. Old CLAUDE.md was canonical (≤150 lines); new CLAUDE.md is ≤30-line
+    #    stub. Only flag if the file looks substantive — we do not auto-truncate.
+    if [[ -f "$TARGET_DIR/CLAUDE.md" ]]; then
+        local existing_lines
+        existing_lines=$(wc -l < "$TARGET_DIR/CLAUDE.md" | tr -d ' ')
+        if (( existing_lines > 50 )); then
+            note "migration: existing CLAUDE.md is $existing_lines lines (new layout expects a ≤30-line stub)."
+            note "          Suggested: copy CLAUDE.md content into AGENTS.md, then re-run init with --force to install the new stub."
+            note "          See .ai-collab/MIGRATION.md for details."
+        fi
+    fi
+}
+maybe_migrate_legacy
+
+# AGENTS.md is the canonical project rules file (cross-tool standard).
 render_template \
-    "$TEMPLATE_DIR/CLAUDE.template.md" \
-    "$TARGET_DIR/CLAUDE.md" \
+    "$TEMPLATE_DIR/AGENTS.template.md" \
+    "$TARGET_DIR/AGENTS.md" \
     "{{PROJECT_NAME}}=$PROJECT_NAME" \
     "{{PROJECT_ONE_LINE_SUMMARY}}=$PROJECT_SUMMARY" \
     "{{LANG_RULE}}=$LANG_RULE" \
     "{{DIR_LIST}}=$DIR_LIST"
 
-build_agents_md "$TARGET_DIR/AGENTS.md"
-
+# CLAUDE.md is now a thin stub pointing back at AGENTS.md (Claude Code only).
 render_template \
-    "$TEMPLATE_DIR/cursorrules.template" \
-    "$TARGET_DIR/.cursorrules"
+    "$TEMPLATE_DIR/CLAUDE.template.md" \
+    "$TARGET_DIR/CLAUDE.md" \
+    "{{PROJECT_NAME}}=$PROJECT_NAME"
+
+# Cursor's modern always-apply rule. Lives in .cursor/rules/ as .mdc.
+render_template \
+    "$TEMPLATE_DIR/cursor-rule-core.mdc.template" \
+    "$TARGET_DIR/.cursor/rules/00-core.mdc" \
+    "{{PROJECT_NAME}}=$PROJECT_NAME" \
+    "{{LANG_RULE}}=$LANG_RULE"
 
 render_template \
     "$TEMPLATE_DIR/lesson_learned.template.md" \
@@ -430,6 +485,10 @@ render_template \
     "$TARGET_DIR/docs/PROJECT_STATUS.md"
 
 render_template \
+    "$TEMPLATE_DIR/PROJECT_GLOSSARY.template.md" \
+    "$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
+
+render_template \
     "$TEMPLATE_DIR/ADR-README.template.md" \
     "$TARGET_DIR/docs/ADR/README.md"
 
@@ -437,13 +496,15 @@ render_template \
     "$TEMPLATE_DIR/ADR-000-template.md" \
     "$TARGET_DIR/docs/ADR/000-template.md"
 
+# Subdirectory runbooks: AGENTS.md (plural) so Codex/Cursor pick them up
+# automatically when working under that directory.
 for dir in "${AGENT_DIRS[@]}"; do
-    claude_path="$(relative_claude_path "$dir")"
+    root_agents_path="$(relative_root_path "$dir" "AGENTS.md")"
     render_template \
-        "$TEMPLATE_DIR/AGENT.template.md" \
-        "$TARGET_DIR/$dir/AGENT.md" \
+        "$TEMPLATE_DIR/AGENTS-subdir.template.md" \
+        "$TARGET_DIR/$dir/AGENTS.md" \
         "{{DIR_NAME}}=$dir" \
-        "{{ROOT_CLAUDE_PATH}}=$claude_path"
+        "{{ROOT_AGENTS_PATH}}=$root_agents_path"
 done
 
 install_builtin_skills() {

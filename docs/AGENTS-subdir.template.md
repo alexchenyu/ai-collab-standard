@@ -1,10 +1,13 @@
 # `{{DIR_NAME}}/` Agent Guide
 
-补充目录级 runbook。Repo 级规则先看 `{{ROOT_CLAUDE_PATH}}`，Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动）见 `.ai-collab/docs/ai-collab-agent-behavior.md`，本文件不重复。
+补充目录级 runbook。Repo 级规则先看 `{{ROOT_AGENTS_PATH}}`，Agent 行为约束（思考前 / 简洁优先 / 精准修改 / 目标驱动）见 `.ai-collab/docs/ai-collab-agent-behavior.md`，本文件不重复。
+
+> Codex CLI 和 Cursor 都会在你工作于 `{{DIR_NAME}}/` 时**自动叠加**本文件的内容，
+> 无需手动 @ 引用。所以本文件只放**目录独有**的规则；通用规则去 `{{ROOT_AGENTS_PATH}}`。
 
 > **什么时候需要这个文件？**
-> 只有当 `{{DIR_NAME}}/` 有**独有的 workflow / 入口 / 坑**，在 repo 级 `CLAUDE.md` 里写不下、也不通用时，才保留本文件。
-> 如果本文件最终内容和根 `CLAUDE.md` 高度重合，**直接删掉本文件**，别维护两份。
+> 只有当 `{{DIR_NAME}}/` 有**独有的 workflow / 入口 / 坑**，在根 `AGENTS.md` 里写不下、也不通用时，才保留本文件。
+> 如果本文件最终内容和根 `AGENTS.md` 高度重合，**直接删掉本文件**，别维护两份。
 >
 > 带 `TODO` 的模板文件不算已落地规范，也不应被当作 canonical source。首次引入后应尽快补全真实入口、命令、测试和边界；如果一周内还无法填实，考虑删除本文件而不是留着空模板。
 

@@ -21,9 +21,10 @@ STAGED=$(git diff --cached --name-only 2>/dev/null || true)
 NEED_CHECK=0
 while IFS= read -r f; do
     case "$f" in
-        CLAUDE.md|AGENTS.md|.cursorrules|lesson_learned.md|\
-        lesson_learned_*.md|docs/PROJECT_STATUS.md|docs/ai-collab-doc-governance.md|\
-        docs/ADR/*|**/AGENT.md|**/AGENTS.md)
+        AGENTS.md|CLAUDE.md|.cursorrules|lesson_learned.md|\
+        lesson_learned_*.md|docs/PROJECT_STATUS.md|docs/PROJECT_GLOSSARY.md|\
+        docs/ai-collab-doc-governance.md|\
+        docs/ADR/*|.cursor/rules/*.mdc|**/AGENT.md|**/AGENTS.md)
             NEED_CHECK=1
             break
             ;;

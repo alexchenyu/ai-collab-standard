@@ -1,9 +1,0 @@
-# 本文件不是 canonical source，仅做 Cursor 极简提醒；正文请去 CLAUDE.md / lesson_learned.md / docs/ADR/。
-# 目标长度：≤ 10 行正文；满了先删再加。
-Reminders:
-- 默认使用中文；除非用户明确要求其它语言。
-- 写代码前先想：假设是否明确？是否最简方案？改动是否最小？成功标准是否可验证？详见 .ai-collab/docs/ai-collab-agent-behavior.md。
-- 看规则先看 CLAUDE.md，看经验先看 lesson_learned.md，看状态先看 docs/PROJECT_STATUS.md，看架构决策先看 docs/ADR/。
-- 子目录有 AGENT.md 时，目录级操作先读 AGENT.md 再看 CLAUDE.md。
-- 不在 .cursorrules 写 scratchpad / Lessons / 工具手册；短期计划用本地 scratchpad，经验进 lesson_learned.md，适合 skill 化就主动建 / 更 skill。
-- TODO: 补一条本项目最容易忘、必须长期记住的一句话提醒（保持 ≤ 1 行）

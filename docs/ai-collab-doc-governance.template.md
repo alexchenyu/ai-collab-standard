@@ -1,16 +1,15 @@
-# AI 协作文档分层治理
+# AI 协作文档分层治理（2026 跨工具标准）
 
 > TL;DR
-> `CLAUDE.md` 放 repo 级主规则，`AGENTS.md` 只做跨 agent 入口。
-> 目录细节放目录级 `AGENT.md`，当前经验放 `lesson_learned.md`。
-> 状态快照（数据规模 / 端口 / 实例 / 版本）放 `docs/PROJECT_STATUS.md`。
-> 架构决策放 `docs/ADR/`，`.cursorrules` 只留 Cursor 专属极简提醒。
-> 任何工具私有文件都不应成为唯一真相源。
-> 当前任务计划 / 进度 / 临时假设可以放本地 scratchpad，但不能进版本控制，也不能当 canonical source。
-> 可复用 agent 能力封装成 skills / runbook，不要塞进 `.cursorrules` 长段说明。
-> `embedding`、chunk JSON、解析结果这类高成本派生成果默认要落盘并复用，不把"重跑"当默认路径。
+> **`AGENTS.md` 是 canonical**（项目级规则唯一真相），被 Codex/Cursor/Copilot/Windsurf/Amp/Devin 原生支持。
+> `CLAUDE.md` 现在是 ≤30 行薄 stub，只放 Claude Code 专属内容并指回 AGENTS.md。
+> Cursor 现代规则用 `.cursor/rules/*.mdc`（带 `alwaysApply` / `globs` frontmatter）；`.cursorrules` 已弃用（Agent 模式静默忽略）。
+> 子目录用 `AGENTS.md`（复数），Codex/Cursor 在该目录工作时**自动叠加**加载。
+> 当前经验放 `lesson_learned.md`，状态快照放 `docs/PROJECT_STATUS.md`，架构决策放 `docs/ADR/`，术语表放 `docs/PROJECT_GLOSSARY.md`。
+> Codex 总预算：所有 AGENTS.md（根 + 递归）累加 ≤ 32 KiB（`project_doc_max_bytes` 默认值）。
+> 当前任务计划放本地 scratchpad（不进 git），可复用工具能力封装成 `.cursor/skills/<name>/SKILL.md`。
 
-这份文档定义当前项目里与 AI 协作相关的几类文档该怎么分工、怎么控制体积、什么内容该写到哪里，避免 `CLAUDE.md`、`.cursorrules`、`AGENT.md`、`lesson_learned.md`、ADR 彼此重叠、持续长胖、最后没人敢改。
+这份文档定义当前项目里与 AI 协作相关的几类文档该怎么分工、怎么控制体积、什么内容该写到哪里，避免 `AGENTS.md`、`CLAUDE.md`、`.cursor/rules/`、子目录 `AGENTS.md`、`lesson_learned.md`、ADR 彼此重叠、持续长胖、最后没人敢改。
 
 ## 目标
 
@@ -29,30 +28,33 @@
 - 工具专属文件只做"薄入口"和少量高价值提醒，不做唯一真相来源。
 - 出现同一条规则时，必须有一个 canonical source，其它文件只做引用或压缩版提醒。
 
-当前建议的 canonical source 分配：
+当前建议的 canonical source 分配（2026 跨工具标准）：
 
-| 信息类型 | Canonical Source |
-| ---- | ---- |
-| Repo 级高频规则 | `CLAUDE.md` |
-| 根级兼容入口 | `AGENTS.md`（仅指针） |
-| 目录级局部 runbook | 各目录的 `AGENT.md` |
-| 当前有效经验 | `lesson_learned.md` |
-| 当前状态快照（数据规模 / 端口 / 实例 / 版本） | `docs/PROJECT_STATUS.md` |
-| 架构决策 | `docs/ADR/*.md` + `docs/ADR/README.md` |
-| 工具特定提醒 | `.cursorrules` |
-| 临时任务工作记忆 | `.agent-scratchpad.local.md` 或 `.ai-collab/runtime/scratchpad.local.md`（不进 git） |
-| 可复用 agent 工具 / 工作流 | `.cursor/skills/`，并通过 `.claude/skills` symlink 共享；`.ai-collab/skills/` 提供内置 skill |
+| 信息类型 | Canonical Source | 谁读它 |
+| ---- | ---- | ---- |
+| **Repo 级高频规则** | **`AGENTS.md`** | Codex / Cursor / Copilot / Windsurf / Amp / Devin |
+| Claude Code 专属补丁 | `CLAUDE.md`（≤ 30 行薄 stub，指回 AGENTS.md） | Claude Code |
+| Cursor `alwaysApply` 注入 | `.cursor/rules/00-core.mdc`（≤ 60 行薄指针，指回 AGENTS.md） | Cursor (Agent / Composer / Chat) |
+| 子目录局部 runbook | 各目录 `AGENTS.md`（复数，递归自动加载） | Codex / Cursor 在该目录工作时 |
+| 当前有效经验 | `lesson_learned.md`（按主题；超过 600 行拆分） | 引用即可 |
+| 当前状态快照（数据规模 / 端口 / 实例 / 版本） | `docs/PROJECT_STATUS.md` | 引用即可 |
+| 项目术语词典（共享语言） | `docs/PROJECT_GLOSSARY.md` | 引用即可 |
+| 架构决策 | `docs/ADR/*.md` + `docs/ADR/README.md` | 引用即可 |
+| 临时任务工作记忆 | `.agent-scratchpad.local.md` 或 `.ai-collab/runtime/scratchpad.local.md`（不进 git） | 仅 agent 自己 |
+| 可复用 agent 工具 / 工作流 | `.cursor/skills/`，并通过 `.claude/skills` symlink 共享；`.ai-collab/skills/` 提供内置 skill | Cursor + Claude Code |
+| **已废弃** | ~~`.cursorrules`~~（Cursor Agent 模式静默忽略） | — |
 
-核心原则：**一条信息只能有一个 canonical source。其它位置如果要引用，只能写"见 X"形式的一句话导航；禁止把同一条结论复制两份。**
+核心原则：**一条信息只能有一个 canonical source。其它位置如果要引用，只能写"见 X"形式的一句话导航；禁止把同一条结论复制两份。** AGENTS.md 是默认入口；只有真正属于某个工具的特化（例如 Claude Code 的 `/agents` 子代理参数）才进 CLAUDE.md / `.cursor/rules/`。
 
 ## 分层结论
 
 | 文件 | 作用 | 应该放什么 | 不该放什么 | 建议体积 |
 |------|------|-----------|-----------|---------|
-| `CLAUDE.md` | 仓库级最高频执行规则 | 全局硬约束、目录、常用命令、稳定选型（向量库 / LLM / 主框架）、行为约定 | 历史背景、长解释、提案、重复细节、会变的数字 / 端口 / 实例数 / 版本号 | **≤ 150 行** |
-| `AGENTS.md` | 根级跨工具入口 | 3-6 行指针，指向 canonical docs | 规则正文、目录级细节、重复手册 | **≤ 15 行** |
-| `.cursorrules` | Cursor 持久提醒层 | 极少量、必须长期记住的补充提醒；开头明确"本文件不是 canonical source" | 成段规范、完整手册、和 `CLAUDE.md` 大段重复 | **≤ 10 行** |
-| `AGENT.md` / `AGENTS.md` | 目录级或场景级 runbook | 某个子目录独有的入口、命令、坑、交付约束 | 全仓库通用规则、架构历史、和 `CLAUDE.md` 重复内容 | 每个文件尽量 **< 80 行** |
+| `AGENTS.md` (根) | **canonical**：仓库级最高频执行规则（跨工具入口） | 全局硬约束、目录、常用命令、稳定选型（向量库 / LLM / 主框架）、行为约定 | 历史背景、长解释、提案、重复细节、会变的数字 / 端口 / 实例数 / 版本号 | **≤ 200 行 / ≤ 8 KiB**；含递归子目录后总和 ≤ 32 KiB（Codex 预算） |
+| `CLAUDE.md` | Claude Code 桩文件，指回 AGENTS.md | "Read AGENTS.md first" + Claude Code 专属补丁（如 `/agents` 子代理参数） | 项目级规则正文（属于 AGENTS.md）、状态数字、ADR 内容 | **≤ 30 行** |
+| `.cursor/rules/00-core.mdc` | Cursor `alwaysApply` 指针 | YAML frontmatter (alwaysApply / description / globs) + 一句话指向 AGENTS.md / behavior 文档 | 项目级规则正文（属于 AGENTS.md）、长段说明（Cursor `alwaysApply` 是每会话 token 预算） | **≤ 60 行**（≈ 2K token） |
+| `<dir>/AGENTS.md`（子目录） | 目录级 runbook，Codex/Cursor 在该目录工作时**自动叠加** | 某个子目录独有的入口、命令、坑、交付约束 | 全仓库通用规则（属于根 AGENTS.md）、架构历史 | 每个文件尽量 **< 80 行** |
+| `.cursorrules` | **已废弃**（Cursor Agent 模式静默忽略） | — | 任何内容；存在的只能是 `.cursorrules.legacy.bak` | — |
 | `lesson_learned.md` | 当前仍有效的非显而易见经验库 | 边界条件、跨模块契约、排障结论、维护经验；按主题组织 | 提案、时间线流水账、已 ADR 化的历史摘要、状态快照 | **≤ 600 行**；超过 350 行先重组章节，超过 600 行按主题拆为独立文件 |
 | `docs/PROJECT_STATUS.md` | 当前状态快照 | 部署状态、数据规模、端口、硬件分配、已知容量 / 限流 | 稳定选型、历史演进、架构决策、经验教训 | **≤ 120 行**，以表格为主 |
 | `docs/ADR/*.md` | 架构决策记录 | 为什么这么设计、替代方案、状态、影响范围 | 高频执行规则、实现碎片、临时排障笔记 | 一决策一文件 |

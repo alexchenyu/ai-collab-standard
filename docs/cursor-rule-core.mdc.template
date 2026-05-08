@@ -1,0 +1,33 @@
+---
+description: Core project context — always inject. Points Cursor at AGENTS.md (canonical) and the AI-collab behavior layer.
+alwaysApply: true
+---
+
+# {{PROJECT_NAME}} — Cursor Always-Apply Pointer
+
+This rule is loaded into every Cursor Chat / Composer / Agent session.
+**It is intentionally tiny** (≈1 KB) so it does not eat into the per-session
+`alwaysApply` token budget. Real content lives in the files listed below.
+
+## Read these first, in order
+
+1. **`AGENTS.md`** — canonical project rules (cross-tool standard).
+2. **`.ai-collab/docs/ai-collab-agent-behavior.md`** — agent behavior constraints (think-before-coding, terse, minimal-diff, goal-driven, scratchpad, skill-ification).
+3. **`docs/PROJECT_GLOSSARY.md`** — shared terminology; check before guessing.
+4. **`lesson_learned.md`** (or `lesson_learned_*.md` topic files) — current
+   non-obvious lessons. Search by topic before retrying a fix.
+
+## Hard rules that must survive even a tiny context window
+
+- {{LANG_RULE}}
+- Before coding, answer: assumption clear? simplest path? minimum diff? success criterion verifiable?
+- Subdirectory has its own `AGENTS.md`? Read that first for directory-specific work.
+- Do not write scratchpad / lessons / how-to into this file. Use `lesson_learned.md` or `.cursor/skills/`.
+
+## Where to put new info (if you would have written it here)
+
+- Stable repo rule → `AGENTS.md` (the canonical file).
+- Fresh lesson / pitfall → `lesson_learned.md` topic.
+- Decision rationale → `docs/ADR/`.
+- Reusable multi-step workflow → `.cursor/skills/<name>/SKILL.md`.
+- Local task plan → `.agent-scratchpad.local.md` (git-ignored).
