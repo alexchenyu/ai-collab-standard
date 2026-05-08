@@ -87,7 +87,9 @@
 推荐作为 Git Submodule 引入到业务项目的 `.ai-collab/` 目录下。
 
 > **新 contributor clone 已配置好的项目时**：git 不会自动跑任何脚本（安全设计）。
-> 必须在仓库根目录手动一次性执行下面的命令（之后都是增量）。
+> 必须在**父仓库根目录**手动一次性执行下面的命令 —— **不是在 `.ai-collab/` 子目录里跑**（之后都是增量）。
+>
+> 自检：跑命令前先 `ls .ai-collab/scripts/install_hooks.sh`，能列出文件说明你在正确的目录。
 >
 > **Linux / macOS / Git for Windows bash**：
 >
@@ -97,6 +99,8 @@
 > bash .ai-collab/scripts/install_hooks.sh .     # 3. 装 pre-commit hook（一次性，幂等）
 > bash .ai-collab/scripts/check.sh               # 4. 健康检查，应输出"全部通过"
 > ```
+>
+> 注意：**不要进 `.ai-collab/` 里跑 `git pull`**。submodule 默认是 detached HEAD，`git pull` 会报 "not currently on a branch"。要升级 submodule，在父仓库根目录跑 `git submodule update --remote --merge .ai-collab`。
 >
 > **Windows PowerShell**（推荐先装 Git for Windows，自带 bash）：
 >
