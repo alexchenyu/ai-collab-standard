@@ -15,6 +15,7 @@ import sys
 CURSORRULES_PATH = ".cursorrules"
 DEFAULT_MAX_CURSORRULES_LINES = 80
 ALLOW_LONG_CURSORRULES_ENV = "AI_COLLAB_ALLOW_LONG_CURSORRULES"
+VERBOSE_ENV = "AI_COLLAB_HOOK_VERBOSE"
 
 
 def run_git(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -46,17 +47,25 @@ def line_count(text: str) -> int:
 
 def check_cursorrules(max_lines: int) -> int:
     if not staged_file_changed(CURSORRULES_PATH):
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print("[ai-collab] no staged .cursorrules change; skipping governance check")
         return 0
 
     if os.environ.get(ALLOW_LONG_CURSORRULES_ENV) == "1":
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print(f"[ai-collab] {ALLOW_LONG_CURSORRULES_ENV}=1; allowing long .cursorrules")
         return 0
 
     staged_text = read_staged_file(CURSORRULES_PATH)
     if staged_text is None:
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print("[ai-collab] staged .cursorrules was deleted; skipping line-count check")
         return 0
 
     lines = line_count(staged_text)
     if lines <= max_lines:
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print(f"[ai-collab] staged .cursorrules ok: {lines}/{max_lines} lines")
         return 0
 
     print("\nAI collab docs governance check failed:", file=sys.stderr)

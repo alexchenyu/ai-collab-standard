@@ -55,6 +55,15 @@ REPO_ROOT="$(git -C "$TARGET_DIR" rev-parse --show-toplevel)"
 HOOK_PATH="$(git -C "$REPO_ROOT" rev-parse --git-path hooks/pre-commit)"
 HOOK_DIR="$(dirname "$HOOK_PATH")"
 
+if [[ -f "$REPO_ROOT/.ai-collab/scripts/check_ai_collab_docs.py" ]]; then
+    CHECKER_SCRIPT=".ai-collab/scripts/check_ai_collab_docs.py"
+elif [[ -f "$REPO_ROOT/scripts/check_ai_collab_docs.py" ]]; then
+    CHECKER_SCRIPT="scripts/check_ai_collab_docs.py"
+else
+    echo "Cannot find check_ai_collab_docs.py in target repo: $REPO_ROOT" >&2
+    exit 1
+fi
+
 if [[ -e "$HOOK_PATH" && "$FORCE" -ne 1 ]]; then
     if grep -q "AI_COLLAB_PRE_COMMIT" "$HOOK_PATH" 2>/dev/null; then
         echo "[ai-collab-hooks] already installed: $HOOK_PATH"
@@ -67,26 +76,29 @@ fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[ai-collab-hooks] would write: $HOOK_PATH"
+    echo "[ai-collab-hooks] checker: $CHECKER_SCRIPT"
     exit 0
 fi
 
 mkdir -p "$HOOK_DIR"
-cat > "$HOOK_PATH" <<'EOF'
+cat > "$HOOK_PATH" <<EOF
 #!/usr/bin/env sh
 # AI_COLLAB_PRE_COMMIT
 set -eu
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
+repo_root="\$(git rev-parse --show-toplevel)"
+cd "\$repo_root"
+
+checker_script="$CHECKER_SCRIPT"
 
 if command -v uv >/dev/null 2>&1; then
-    uv run python .ai-collab/scripts/check_ai_collab_docs.py
+    uv run python "\$checker_script"
 elif command -v python3 >/dev/null 2>&1; then
-    python3 .ai-collab/scripts/check_ai_collab_docs.py
+    python3 "\$checker_script"
 elif command -v python >/dev/null 2>&1; then
-    python .ai-collab/scripts/check_ai_collab_docs.py
+    python "\$checker_script"
 elif command -v py >/dev/null 2>&1; then
-    py -3 .ai-collab/scripts/check_ai_collab_docs.py
+    py -3 "\$checker_script"
 else
     echo "AI collab pre-commit hook requires uv or Python 3." >&2
     exit 1

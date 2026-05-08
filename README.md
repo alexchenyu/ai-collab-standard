@@ -63,6 +63,18 @@ rg -n 'TODO' .
 bash .ai-collab/scripts/install_hooks.sh .
 ```
 
+如果是在维护 `.ai-collab` 仓库本身，则在它自己的 repo 根目录安装：
+
+```bash
+bash scripts/install_hooks.sh .
+```
+
+hook 默认只在失败时输出内容。需要确认它是否运行时，可以临时打开详细输出：
+
+```bash
+AI_COLLAB_HOOK_VERBOSE=1 git commit -m "..."
+```
+
 ### 第四步：日常更新与维护
 
 当 `ai-collab-standard` 仓库（即本仓库）更新了新的模板或治理规范时，你可以在业务项目中一键拉取最新规范：
