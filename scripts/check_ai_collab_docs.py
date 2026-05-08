@@ -13,8 +13,11 @@ import sys
 
 
 CURSORRULES_PATH = ".cursorrules"
+AGENTS_PATH = "AGENTS.md"
 DEFAULT_MAX_CURSORRULES_LINES = 80
+DEFAULT_MAX_AGENTS_LINES = 40
 ALLOW_LONG_CURSORRULES_ENV = "AI_COLLAB_ALLOW_LONG_CURSORRULES"
+ALLOW_LONG_AGENTS_ENV = "AI_COLLAB_ALLOW_LONG_AGENTS"
 VERBOSE_ENV = "AI_COLLAB_HOOK_VERBOSE"
 
 
@@ -89,6 +92,50 @@ def check_cursorrules(max_lines: int) -> int:
     return 1
 
 
+def check_agents(max_lines: int) -> int:
+    if not staged_file_changed(AGENTS_PATH):
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print("[ai-collab] no staged AGENTS.md change; skipping governance check")
+        return 0
+
+    if os.environ.get(ALLOW_LONG_AGENTS_ENV) == "1":
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print(f"[ai-collab] {ALLOW_LONG_AGENTS_ENV}=1; allowing long AGENTS.md")
+        return 0
+
+    staged_text = read_staged_file(AGENTS_PATH)
+    if staged_text is None:
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print("[ai-collab] staged AGENTS.md was deleted; skipping line-count check")
+        return 0
+
+    lines = line_count(staged_text)
+    if lines <= max_lines:
+        if os.environ.get(VERBOSE_ENV) == "1":
+            print(f"[ai-collab] staged AGENTS.md ok: {lines}/{max_lines} lines")
+        return 0
+
+    print("\nAI collab docs governance check failed:", file=sys.stderr)
+    print(
+        f"- staged {AGENTS_PATH} has {lines} lines; limit is {max_lines}.",
+        file=sys.stderr,
+    )
+    print(
+        "- Keep root AGENTS.md as a Codex/cross-agent entry point, not a second manual.",
+        file=sys.stderr,
+    )
+    print(
+        "- Move repo rules to CLAUDE.md, implementation lessons to lesson_learned.md, "
+        "and decisions to docs/ADR/.",
+        file=sys.stderr,
+    )
+    print(
+        f"- Deliberate exception for one commit: set {ALLOW_LONG_AGENTS_ENV}=1.",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -97,9 +144,18 @@ def main() -> int:
         default=DEFAULT_MAX_CURSORRULES_LINES,
         help="Maximum allowed staged line count for .cursorrules.",
     )
+    parser.add_argument(
+        "--max-agents-lines",
+        type=int,
+        default=DEFAULT_MAX_AGENTS_LINES,
+        help="Maximum allowed staged line count for root AGENTS.md.",
+    )
     args = parser.parse_args()
 
-    return check_cursorrules(args.max_cursorrules_lines)
+    return max(
+        check_cursorrules(args.max_cursorrules_lines),
+        check_agents(args.max_agents_lines),
+    )
 
 
 if __name__ == "__main__":
