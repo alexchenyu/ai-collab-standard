@@ -12,6 +12,12 @@
 # 绕过：git commit --no-verify （仅在明确必要时）
 set -uo pipefail
 
+# Bash 3.2+ compatible. Forwards to check.sh which has the same guard.
+if (( ${BASH_VERSINFO[0]:-0} < 3 )); then
+    echo "pre-commit hook requires Bash 3.2+; you have ${BASH_VERSION:-unknown}." >&2
+    exit 1
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$REPO_ROOT"
 

@@ -32,10 +32,18 @@ Options:
   --agent-dir DIR        Create DIR/AGENTS.md from template (repeatable)
   --config-path PATH     Config file path in AGENTS.md (default: auto-detect or TODO)
   --lang LANG            Default language rule: zh | en (default: zh)
-  --force                Overwrite existing files
+  --force                Overwrite existing layout files (AGENTS.md, CLAUDE.md,
+                         .cursor/rules/00-core.mdc, governance docs, hook).
+                         Does NOT touch user-content files (lesson_learned.md,
+                         docs/PROJECT_STATUS.md, docs/PROJECT_GLOSSARY.md,
+                         docs/ADR/README.md, subdir AGENTS.md) once they exist.
   --dry-run              Print planned actions without writing files
   --install-hook         Install pre-commit hook into .git/hooks (copies pre-commit.sh)
+  --install-cursor-hook  Install .cursor/hooks.json (afterFileEdit governance check;
+                         see .ai-collab/templates/cursor-hooks.json.template)
   --enable-codex-skills  Opt in to .codex/skills -> ../.cursor/skills symlink
+                         (auto-detected if ~/.codex/ exists; pass --no-codex-skills to override)
+  --no-codex-skills      Disable Codex skills auto-symlink even if ~/.codex/ exists
   --migrate-legacy       Detect and migrate legacy CLAUDE.md-canonical / AGENT.md /
                          .cursorrules layout into the new AGENTS.md-canonical layout
   --check                Run the governance health check on TARGET_DIR instead of initializing
@@ -67,7 +75,9 @@ LANG_OPTION="zh"
 FORCE=0
 DRY_RUN=0
 INSTALL_HOOK=0
+INSTALL_CURSOR_HOOK=0
 CHECK_ONLY=0
+# 0 = off, 1 = explicit on, -1 = explicit off; auto-detect resolves 0 to 1 when ~/.codex exists.
 ENABLE_CODEX_SKILLS=0
 MIGRATE_LEGACY=0
 declare -a AGENT_DIRS=()
@@ -118,8 +128,16 @@ while (($# > 0)); do
             INSTALL_HOOK=1
             shift
             ;;
+        --install-cursor-hook)
+            INSTALL_CURSOR_HOOK=1
+            shift
+            ;;
         --enable-codex-skills)
             ENABLE_CODEX_SKILLS=1
+            shift
+            ;;
+        --no-codex-skills)
+            ENABLE_CODEX_SKILLS=-1
             shift
             ;;
         --migrate-legacy)
@@ -319,6 +337,50 @@ PY
     note "wrote: $dst"
 }
 
+# Like render_template but **never overwrites** an existing file, even with --force.
+# Use for user-data files (lesson_learned.md, PROJECT_STATUS.md, PROJECT_GLOSSARY.md,
+# docs/ADR/README.md) where the template is only a first-time scaffold and any
+# subsequent content is project-specific. Avoids data loss when users run
+# `--migrate-legacy --force` to swap layout files.
+render_template_protected() {
+    local src="$1"
+    local dst="$2"
+    shift 2
+
+    if [[ -e "$dst" ]]; then
+        if [[ "$FORCE" -eq 1 ]]; then
+            note "preserve user content (--force ignored): $dst"
+        else
+            note "skip existing: $dst"
+        fi
+        SKIPPED_FILES+=("$dst")
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        local placeholder_count
+        placeholder_count=$(grep -oE '\{\{[A-Z0-9_]+\}\}' "$src" 2>/dev/null | wc -l || true)
+        note "render (protected, first-time only): $src -> $dst ($placeholder_count placeholders)"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+    python3 - "$src" "$dst" "$@" <<'PY'
+from pathlib import Path
+import sys
+
+src = Path(sys.argv[1])
+dst = Path(sys.argv[2])
+text = src.read_text()
+for item in sys.argv[3:]:
+    key, value = item.split("=", 1)
+    text = text.replace(key, value)
+dst.write_text(text)
+PY
+    CREATED_FILES+=("$dst")
+    note "wrote: $dst"
+}
+
 write_text() {
     local dst="$1"
     local content="$2"
@@ -472,35 +534,39 @@ render_template \
     "{{PROJECT_NAME}}=$PROJECT_NAME" \
     "{{LANG_RULE}}=$LANG_RULE"
 
-render_template \
+# User-content files: scaffold once, never auto-overwrite (even with --force).
+# These accumulate real project lessons / status / terms / ADR catalog.
+render_template_protected \
     "$TEMPLATE_DIR/lesson_learned.template.md" \
     "$TARGET_DIR/lesson_learned.md"
 
-render_template \
-    "$TEMPLATE_DIR/ai-collab-doc-governance.template.md" \
-    "$TARGET_DIR/docs/ai-collab-doc-governance.md"
-
-render_template \
+render_template_protected \
     "$TEMPLATE_DIR/PROJECT_STATUS.template.md" \
     "$TARGET_DIR/docs/PROJECT_STATUS.md"
 
-render_template \
+render_template_protected \
     "$TEMPLATE_DIR/PROJECT_GLOSSARY.template.md" \
     "$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
 
-render_template \
+render_template_protected \
     "$TEMPLATE_DIR/ADR-README.template.md" \
     "$TARGET_DIR/docs/ADR/README.md"
+
+# Governance + ADR template are managed docs (track upstream); --force ok.
+render_template \
+    "$TEMPLATE_DIR/ai-collab-doc-governance.template.md" \
+    "$TARGET_DIR/docs/ai-collab-doc-governance.md"
 
 render_template \
     "$TEMPLATE_DIR/ADR-000-template.md" \
     "$TARGET_DIR/docs/ADR/000-template.md"
 
 # Subdirectory runbooks: AGENTS.md (plural) so Codex/Cursor pick them up
-# automatically when working under that directory.
+# automatically when working under that directory. Protected: scaffold once,
+# don't trample user-customized runbook content on subsequent --force runs.
 for dir in "${AGENT_DIRS[@]}"; do
     root_agents_path="$(relative_root_path "$dir" "AGENTS.md")"
-    render_template \
+    render_template_protected \
         "$TEMPLATE_DIR/AGENTS-subdir.template.md" \
         "$TARGET_DIR/$dir/AGENTS.md" \
         "{{DIR_NAME}}=$dir" \
@@ -517,6 +583,10 @@ install_builtin_skills() {
     local src
     local dst
 
+    # Bundled skills are managed artifacts (canonical lives in .ai-collab/skills/).
+    # Always re-install: cheap (cp -R), idempotent, picks up upstream updates after
+    # `git -C .ai-collab pull`. Each bundled SKILL.md should carry a banner telling
+    # users not to edit the installed copy in-place.
     for skill_dir in "$BUILTIN_SKILLS_DIR"/*; do
         [[ -d "$skill_dir" ]] || continue
         [[ -f "$skill_dir/SKILL.md" ]] || continue
@@ -525,22 +595,24 @@ install_builtin_skills() {
         src="$skill_dir"
         dst="$TARGET_DIR/.cursor/skills/$skill_name"
 
-        if [[ -e "$dst" && "$FORCE" -ne 1 ]]; then
-            note "skip existing bundled skill: $dst"
-            SKIPPED_FILES+=("$dst")
-            continue
-        fi
-
         if (( DRY_RUN == 1 )); then
             note "(dry-run) would install bundled skill: $src -> $dst"
             continue
         fi
 
         mkdir -p "$(dirname "$dst")"
+        # Compare first; only rewrite when content actually differs (avoids
+        # touching mtimes / triggering watchers when nothing changed).
+        if [[ -e "$dst" ]] && diff -rq "$src" "$dst" >/dev/null 2>&1; then
+            note "bundled skill already up-to-date: $dst"
+            SKIPPED_FILES+=("$dst")
+            continue
+        fi
+
         rm -rf "$dst"
         cp -R "$src" "$dst"
         CREATED_FILES+=("$dst")
-        note "installed bundled skill: $dst"
+        note "installed/updated bundled skill: $dst"
     done
 }
 
@@ -649,12 +721,24 @@ link_codex_skills() {
     local codex_skills="$codex_dir/skills"
     local gitignore="$TARGET_DIR/.gitignore"
 
-    if (( ENABLE_CODEX_SKILLS != 1 )); then
+    # Codex skills resolution:
+    #   ENABLE_CODEX_SKILLS == 1   -> explicit --enable-codex-skills, always on
+    #   ENABLE_CODEX_SKILLS == -1  -> explicit --no-codex-skills, always off
+    #   ENABLE_CODEX_SKILLS == 0   -> auto-detect: enable iff ~/.codex/ exists OR
+    #                                 `codex` is on PATH (user has Codex installed)
+    if (( ENABLE_CODEX_SKILLS == -1 )); then
         return 0
+    fi
+    if (( ENABLE_CODEX_SKILLS == 0 )); then
+        if [[ -d "$HOME/.codex" ]] || command -v codex >/dev/null 2>&1; then
+            note "auto-detected Codex (~/.codex or codex on PATH); enabling .codex/skills symlink"
+        else
+            return 0
+        fi
     fi
 
     if [[ ! -d "$cursor_skills" ]]; then
-        note "warning: --enable-codex-skills requested but .cursor/skills does not exist; skip codex skills link"
+        note "warning: codex skills requested but .cursor/skills does not exist; skip codex skills link"
         return 0
     fi
 
@@ -791,6 +875,25 @@ if (( INSTALL_HOOK == 1 )); then
     fi
 fi
 
+# Optionally install Cursor afterFileEdit hook (.cursor/hooks.json + script)
+if (( INSTALL_CURSOR_HOOK == 1 )); then
+    CURSOR_HOOK_TPL="$REPO_ROOT/templates/cursor-hooks.json.template"
+    CURSOR_HOOK_DST="$TARGET_DIR/.cursor/hooks.json"
+    if [[ ! -f "$CURSOR_HOOK_TPL" ]]; then
+        note "warning: cursor-hooks.json.template not found at $CURSOR_HOOK_TPL, skip"
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+        note "(dry-run) would install Cursor hooks to $CURSOR_HOOK_DST"
+    else
+        mkdir -p "$TARGET_DIR/.cursor"
+        if [[ -f "$CURSOR_HOOK_DST" && "$FORCE" -ne 1 ]]; then
+            note "Cursor hooks.json already exists at $CURSOR_HOOK_DST; use --force to overwrite"
+        else
+            cp "$CURSOR_HOOK_TPL" "$CURSOR_HOOK_DST"
+            note "installed Cursor hooks: $CURSOR_HOOK_DST (afterFileEdit -> cursor-doc-check-hook.sh)"
+        fi
+    fi
+fi
+
 note "done"
 if [[ "$DRY_RUN" -eq 1 ]]; then
     note "(dry-run, nothing was written)"
@@ -802,5 +905,8 @@ else
     note "next: bash $SCRIPT_DIR/check.sh \"$TARGET_DIR\"  # run governance health check"
     if (( INSTALL_HOOK == 0 )); then
         note "tip:  bash $SCRIPT_DIR/init_ai_collab_docs.sh \"$TARGET_DIR\" --install-hook  # enable pre-commit guardrail"
+    fi
+    if (( INSTALL_CURSOR_HOOK == 0 )); then
+        note "tip:  bash $SCRIPT_DIR/init_ai_collab_docs.sh \"$TARGET_DIR\" --install-cursor-hook  # Cursor afterFileEdit governance check"
     fi
 fi

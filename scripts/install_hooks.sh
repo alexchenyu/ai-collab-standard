@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Bash 3.2+ compatible (no associative arrays / mapfile / case-modify expansions).
+if (( ${BASH_VERSINFO[0]:-0} < 3 )); then
+    echo "install_hooks.sh requires Bash 3.2+; you have ${BASH_VERSION:-unknown}." >&2
+    exit 1
+fi
+
 usage() {
     cat <<'EOF'
 Usage:

@@ -22,6 +22,15 @@
 #   2  仅软警告
 set -uo pipefail
 
+# Bash 3.2+ compatibility: this script intentionally avoids associative arrays
+# (declare -A), mapfile/readarray, and ${var^^}/${var,,} so it runs on macOS's
+# default Bash 3.2 and Git for Windows. If you add a Bash 4+ feature, raise
+# this guard to (( BASH_VERSINFO[0] >= 4 )) and tell users to install bash 4.
+if (( ${BASH_VERSINFO[0]:-0} < 3 )); then
+    echo "check.sh requires Bash 3.2+; you have ${BASH_VERSION:-unknown}." >&2
+    exit 1
+fi
+
 TARGET_DIR="${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 

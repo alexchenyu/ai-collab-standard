@@ -86,6 +86,31 @@
 
 推荐作为 Git Submodule 引入到业务项目的 `.ai-collab/` 目录下。
 
+> **新 contributor clone 已配置好的项目时**：git 不会自动跑任何脚本（安全设计）。
+> 必须在仓库根目录手动一次性执行下面的命令（之后都是增量）。
+>
+> **Linux / macOS / Git for Windows bash**：
+>
+> ```bash
+> git pull                                       # 1. 拉父仓库（带上 submodule pointer 更新）
+> git submodule update --init --recursive        # 2. 同步子模块到父记录的 SHA
+> bash .ai-collab/scripts/install_hooks.sh .     # 3. 装 pre-commit hook（一次性，幂等）
+> bash .ai-collab/scripts/check.sh               # 4. 健康检查，应输出"全部通过"
+> ```
+>
+> **Windows PowerShell**（推荐先装 Git for Windows，自带 bash）：
+>
+> ```powershell
+> git pull
+> git submodule update --init --recursive
+> bash .ai-collab/scripts/install_hooks.sh .   # 调用 Git for Windows 自带的 bash
+> bash .ai-collab/scripts/check.sh
+> ```
+>
+> 前置依赖：`git` + `bash`（Linux/macOS 自带；Windows 装 Git for Windows）+ `python3` 或 `uv`（pre-commit 运行时需要）。
+>
+> 推荐把这一段写进**业务项目根目录的 `AGENTS.md` 顶部**（本仓库的 `AGENTS.template.md` 已带这段，用 `bootstrap.sh` / `bootstrap.ps1` 新建项目时自动继承）。
+
 ### 1. 一行安装 / 更新
 
 **Linux / macOS / Git Bash**：

@@ -7,6 +7,33 @@
 > 跨工具标准）。Claude Code 通过同目录 `CLAUDE.md` 桩文件指向本文件。
 > 修改本文件 = 修改全 agent 的项目级 instructions。
 
+## 新克隆 / 新拉取后第一步（contributor onboarding）
+
+> Git 不会在 clone/pull 后自动跑任何脚本（安全设计）。下面四步是**首次进入本仓库时（或同步远端后第一次）**在仓库根目录手动跑一次，之后都是增量。
+
+**Linux / macOS / Git Bash（含 Windows Git for Windows）：**
+
+```bash
+git pull                                       # 1. 先拉父仓库（带上 submodule pointer 更新）
+git submodule update --init --recursive        # 2. 同步子模块到父记录的 SHA
+bash .ai-collab/scripts/install_hooks.sh .     # 3. 装 pre-commit hook（一次性，幂等）
+bash .ai-collab/scripts/check.sh               # 4. 健康检查，应输出"全部通过"
+```
+
+**Windows PowerShell**（无 Git Bash 时；推荐装 Git for Windows）：
+
+```powershell
+git pull
+git submodule update --init --recursive
+bash .ai-collab/scripts/install_hooks.sh .   # 仍需 bash；Git for Windows 自带 C:\Program Files\Git\bin\bash.exe
+bash .ai-collab/scripts/check.sh
+```
+
+**前置依赖**：`git` + `bash` + `python3` 或 `uv`（pre-commit hook 运行时需要）。
+
+如果 `check.sh` 报"legacy 残留"（如 `.cursorrules` / 单数 `AGENT.md`），跑迁移：
+`bash .ai-collab/scripts/init_ai_collab_docs.sh . --migrate-legacy`（详见 `.ai-collab/MIGRATION.md`）。
+
 ## 协作约定
 
 - {{LANG_RULE}}

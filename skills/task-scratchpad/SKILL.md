@@ -4,6 +4,8 @@ description: Maintain Devin-style short-term task memory without polluting canon
 ---
 # Task Scratchpad
 
+> **Canonical source: `.ai-collab/skills/task-scratchpad/SKILL.md`** (bundled with [ai-collab-standard](https://github.com/alexchenyu/ai-collab-standard)). The copy under `.cursor/skills/task-scratchpad/SKILL.md` is auto-installed by `init_ai_collab_docs.sh` and **will be overwritten**. Edit upstream and PR back; do not edit the local copy in-place.
+
 Use this for non-trivial tasks where a short-lived plan, assumptions, progress, or verification checklist would reduce drift.
 
 ## Scratchpad Path
