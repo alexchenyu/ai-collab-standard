@@ -17,6 +17,14 @@
 #   - 子文件继续受治理（每个 ≤ LESSON_SOFT 行；超出继续提示按 ### 子主题再拆）
 set -uo pipefail
 
+# This script uses associative arrays (declare -A), which require bash 4+.
+# macOS ships bash 3.2 by default; users must `brew install bash` first.
+if (( ${BASH_VERSINFO[0]:-0} < 4 )); then
+    echo "Error: this script requires bash 4 or newer (found: ${BASH_VERSION:-unknown})." >&2
+    echo "On macOS install a newer bash with: brew install bash" >&2
+    exit 1
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 SOURCE="$REPO_ROOT/lesson_learned.md"
 APPLY=0

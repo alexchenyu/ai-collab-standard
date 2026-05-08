@@ -1,1 +1,24 @@
-*.sh text eol=lf
+# Force LF on all text files so Windows checkouts (autocrlf=true) don't break
+# shell scripts, Python scripts, or git hooks.
+*               text=auto eol=lf
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.py            text eol=lf
+*.ps1           text eol=lf
+*.md            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.toml          text eol=lf
+*.json          text eol=lf
+*.template      text eol=lf
+.cursorrules    text eol=lf
+.gitattributes  text eol=lf
+.gitignore      text eol=lf
+
+# Treat binary just in case anyone adds them
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.pdf           binary

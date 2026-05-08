@@ -181,9 +181,18 @@ check_behavior_pointer() {
     fi
 }
 
+is_windows_env() {
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+    esac
+    return 1
+}
+
 check_claude_skills_symlink() {
     # If project has .cursor/skills, .claude/skills should symlink to it
     # so Claude Code can discover the same skills as Cursor.
+    # On Windows, init_ai_collab_docs.sh falls back to copy-instead-of-link;
+    # in that case we accept a directory if it exists and is non-empty.
     local cursor_skills="$TARGET_DIR/.cursor/skills"
     local claude_skills="$TARGET_DIR/.claude/skills"
     if [[ ! -d "$cursor_skills" ]]; then
@@ -199,6 +208,10 @@ check_claude_skills_symlink() {
         fi
         SOFT_WARNS+=(".claude/skills 是 symlink 但目标不对：$current_target （期望 ../.cursor/skills）")
         printf "  \033[33m[WARN]\033[0m .claude/skills 目标错误：%s\n" "$current_target"
+    elif [[ -d "$claude_skills" ]] && is_windows_env; then
+        PASSED+=(".claude/skills 已通过 Windows 复制 fallback 同步")
+        printf "  \033[32m[ OK ]\033[0m .claude/skills 已通过 Windows 复制 fallback 同步（symlink 不可用时的预期行为）\n"
+        printf "        提醒：上游 .cursor/skills 改动后需重跑 init_ai_collab_docs.sh\n"
     elif [[ -e "$claude_skills" ]]; then
         SOFT_WARNS+=(".claude/skills 存在但不是 symlink；Cursor / Claude Code 会读到不同的 skill 副本")
         printf "  \033[33m[WARN]\033[0m .claude/skills 不是 symlink\n"
@@ -234,6 +247,9 @@ check_codex_skills_symlink() {
         fi
         SOFT_WARNS+=(".codex/skills 是 symlink 但目标不对：$current_target （期望 ../.cursor/skills）")
         printf "  \033[33m[WARN]\033[0m .codex/skills 目标错误：%s\n" "$current_target"
+    elif [[ -d "$codex_skills" ]] && is_windows_env; then
+        PASSED+=(".codex/skills 已通过 Windows 复制 fallback 同步")
+        printf "  \033[32m[ OK ]\033[0m .codex/skills 已通过 Windows 复制 fallback 同步\n"
     elif [[ -e "$codex_skills" ]]; then
         SOFT_WARNS+=(".codex/skills 存在但不是 symlink；Cursor / Codex 可能读到不同的 skill 副本")
         printf "  \033[33m[WARN]\033[0m .codex/skills 不是 symlink\n"

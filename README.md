@@ -76,14 +76,14 @@
 在项目根目录运行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash
 ```
 
 这条命令会自动：
 
 - 如果当前目录还不是 git repo，先 `git init`
 - 新项目：添加 `.ai-collab` submodule
-- 老项目：更新 `.ai-collab` 到 `origin/master`
+- 老项目：更新 `.ai-collab` 到远端默认分支（自动探测 `main` / `master`）
 - 生成 / 更新协作文档入口
 - 安装内置 skills（含 `task-scratchpad`）
 - 安装 pre-commit hook
@@ -93,13 +93,16 @@ curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/maste
 
 ```bash
 # 英文项目
-curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --lang en
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash -s -- --lang en
 
 # 显式指定项目名和目录级 runbook
-curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --project-name "My Project" --agent-dir backend --agent-dir frontend
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash -s -- --project-name "My Project" --agent-dir backend --agent-dir frontend
 
 # 启用 Codex skills
-curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- --codex
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash -s -- --codex
+
+# Windows PowerShell（无 bash / WSL 时）
+iwr -useb https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.ps1 | iex
 ```
 
 ### 2. 手动引入 Submodule
@@ -187,10 +190,12 @@ check.sh 会报告：
 ### 7. 持续更新
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash
 
-# 或手动更新：
-git -C .ai-collab fetch origin && git -C .ai-collab checkout origin/master
+# 或手动更新（探测远端默认分支）：
+git -C .ai-collab fetch origin
+default_branch="$(git -C .ai-collab symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@')"
+git -C .ai-collab checkout "origin/${default_branch:-main}"
 bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 若要用新模板覆盖（谨慎）
 ```
 

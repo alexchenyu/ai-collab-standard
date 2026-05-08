@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This script uses associative arrays (declare -A), which require bash 4+.
+# macOS ships bash 3.2 by default; users must `brew install bash` and run with
+# `/opt/homebrew/bin/bash` (Apple Silicon) or `/usr/local/bin/bash` (Intel).
+if (( ${BASH_VERSINFO[0]:-0} < 4 )); then
+    echo "Error: this script requires bash 4 or newer (found: ${BASH_VERSION:-unknown})." >&2
+    echo "On macOS the default bash is 3.2; install a newer one with:" >&2
+    echo "  brew install bash" >&2
+    echo "Then re-run with: /opt/homebrew/bin/bash $0 ..." >&2
+    echo "(Apple Silicon path; on Intel macOS use /usr/local/bin/bash)" >&2
+    exit 1
+fi
+
 usage() {
     cat <<'EOF'
 Usage:
@@ -159,6 +171,53 @@ note() {
     echo "[init-ai-docs] $*"
 }
 
+# Detect Windows-ish environments (Git Bash / MSYS2 / Cygwin). On real Windows
+# `ln -s` either silently creates a useless copy or needs Developer Mode +
+# Git's `core.symlinks=true`; we fall back to copying in that case.
+is_windows_env() {
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+    esac
+    return 1
+}
+
+# Cross-platform "create a link from $1 (target, relative to link parent) at
+# $2 (link path)". Tries `ln -s`; on Windows or when the result is not a
+# working symlink, falls back to copying and warns the user.
+os_link_or_copy() {
+    local target="$1"
+    local linkpath="$2"
+    local resolved_target
+
+    # On Windows fall back directly to copy; symlinks are too unreliable
+    # without Developer Mode + the right git config.
+    if is_windows_env; then
+        resolved_target="$(cd "$(dirname "$linkpath")" 2>/dev/null && cd "$target" 2>/dev/null && pwd)" || true
+        if [[ -z "$resolved_target" ]]; then
+            note "warning (windows): cannot resolve symlink target '$target' from '$linkpath'; skip"
+            return 1
+        fi
+        rm -rf "$linkpath"
+        cp -R "$resolved_target" "$linkpath"
+        note "windows fallback: copied $resolved_target -> $linkpath (symlinks unreliable on Windows; rerun init after upstream skills change)"
+        return 0
+    fi
+
+    if ln -s "$target" "$linkpath" 2>/dev/null; then
+        return 0
+    fi
+
+    # ln failed (e.g. exFAT / iCloud Drive / certain network mounts).
+    note "warning: ln -s failed at $linkpath; falling back to copy. Rerun init after upstream skills change to keep in sync."
+    resolved_target="$(cd "$(dirname "$linkpath")" 2>/dev/null && cd "$target" 2>/dev/null && pwd)" || true
+    if [[ -z "$resolved_target" ]]; then
+        note "warning: cannot resolve symlink target '$target' from '$linkpath'; skip"
+        return 1
+    fi
+    rm -rf "$linkpath"
+    cp -R "$resolved_target" "$linkpath"
+}
+
 describe_dir() {
     case "$1" in
         core|src|app|backend|server|api)
@@ -228,7 +287,7 @@ render_template() {
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
         local placeholder_count
-        placeholder_count=$(grep -oP '\{\{[A-Z0-9_]+\}\}' "$src" 2>/dev/null | wc -l || true)
+        placeholder_count=$(grep -oE '\{\{[A-Z0-9_]+\}\}' "$src" 2>/dev/null | wc -l || true)
         note "render: $src -> $dst ($placeholder_count placeholders)"
         return 0
     fi
@@ -464,7 +523,7 @@ link_claude_skills() {
                 note "(dry-run) would replace $claude_skills (current: ${current_target:-<dir>}) with symlink to ../.cursor/skills"
             else
                 rm -rf "$claude_skills"
-                ln -s "../.cursor/skills" "$claude_skills"
+                os_link_or_copy "../.cursor/skills" "$claude_skills"
                 note "replaced (--force): $claude_skills -> ../.cursor/skills"
             fi
         else
@@ -475,7 +534,7 @@ link_claude_skills() {
             note "(dry-run) would create symlink: $claude_skills -> ../.cursor/skills"
         else
             mkdir -p "$claude_dir"
-            ln -s "../.cursor/skills" "$claude_skills"
+            os_link_or_copy "../.cursor/skills" "$claude_skills"
             note "linked: $claude_skills -> ../.cursor/skills"
         fi
     fi
@@ -548,7 +607,7 @@ link_codex_skills() {
                 note "(dry-run) would replace $codex_skills (current: ${current_target:-<dir>}) with symlink to ../.cursor/skills"
             else
                 rm -rf "$codex_skills"
-                ln -s "../.cursor/skills" "$codex_skills"
+                os_link_or_copy "../.cursor/skills" "$codex_skills"
                 note "replaced (--force): $codex_skills -> ../.cursor/skills"
             fi
         else
@@ -559,7 +618,7 @@ link_codex_skills() {
             note "(dry-run) would create symlink: $codex_skills -> ../.cursor/skills"
         else
             mkdir -p "$codex_dir"
-            ln -s "../.cursor/skills" "$codex_skills"
+            os_link_or_copy "../.cursor/skills" "$codex_skills"
             note "linked: $codex_skills -> ../.cursor/skills"
         fi
     fi

@@ -10,8 +10,8 @@ declare -a INIT_ARGS=()
 usage() {
     cat <<'EOF'
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/master/scripts/bootstrap.sh | bash -s -- [options]
+  curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/alexchenyu/ai-collab-standard/main/scripts/bootstrap.sh | bash -s -- [options]
 
 Install or update .ai-collab in the current project, run init, then run check.
 
@@ -63,7 +63,12 @@ fi
 if [[ -d ".ai-collab/.git" || -f ".ai-collab/.git" ]]; then
     note "updating existing .ai-collab"
     git -C .ai-collab fetch origin
-    git -C .ai-collab checkout origin/master
+    # Resolve the remote default branch dynamically (main/master). Fall back to
+    # main if HEAD is unknown locally, which works for new GitHub repos.
+    default_branch="$(git -C .ai-collab symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@' || true)"
+    default_branch="${default_branch:-main}"
+    note "checking out origin/$default_branch"
+    git -C .ai-collab checkout "origin/$default_branch"
 elif [[ -e ".ai-collab" ]]; then
     echo ".ai-collab exists but is not a git checkout; move it aside or remove it first" >&2
     exit 1
