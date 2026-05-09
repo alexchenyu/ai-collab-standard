@@ -7,6 +7,24 @@ description: Create new agent skills with proper structure, progressive disclosu
 
 > **Canonical source: `.ai-collab/skills/write-a-skill/SKILL.md`** (bundled with [ai-collab-standard](https://github.com/alexchenyu/ai-collab-standard)). The copy under `.cursor/skills/write-a-skill/SKILL.md` is auto-installed by `init_ai_collab_docs.sh` and **will be overwritten** by future updates. Edit upstream and PR back; do not edit the local copy in-place.
 
+## Step 0 — Decide: upstream skill or project-level skill?
+
+Before drafting anything, answer one question:
+
+> **Would another project that adopts ai-collab-standard also benefit from this skill?**
+
+| Answer | Where the skill lives | Examples |
+|--------|----------------------|----------|
+| **Yes** — generic AI-collab / engineering practice (any team using the standard could reuse it as-is) | `.ai-collab/skills/<name>/SKILL.md` (canonical, ships with the standard, gets auto-installed into every consuming project's `.cursor/skills/`) | `task-scratchpad`, `standard-migration`, `write-a-skill`, `adr-maintenance` |
+| **No** — references project-specific paths, scripts, services, datasets, hardware, or business rules | `.cursor/skills/<name>/SKILL.md` (project-level, lives in this repo only, never synced upstream) | `qwen-chunking-runbook` (specific ports + scripts), `rag-sync-pipeline` (specific data dirs) |
+
+Heuristic test for "generic enough":
+
+- Replace every concrete path / script / service name with a placeholder. Does the skill still make sense and still pull its weight? → **upstream**.
+- Otherwise → **project-level**. Don't try to over-generalise; a focused project skill beats a vague upstream one.
+
+If unsure, default to project-level. Promoting a project skill upstream later is cheap (move file + add canonical banner); demoting an over-generalised upstream skill that nobody else can use is awkward.
+
 ## Process
 
 1. **Gather requirements** - ask user about:
