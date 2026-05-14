@@ -157,6 +157,7 @@ If a workflow is reusable and needs multiple commands, tools, examples, or resou
 - Keep `CLAUDE.md`, `.cursorrules`, and `AGENTS.md` as entry points, not tool manuals.
 - Prefer a shared `.claude/skills -> ../.cursor/skills` symlink when Claude Code needs the same capabilities.
 - Enable Codex skills only by explicit opt-in (`init_ai_collab_docs.sh --enable-codex-skills`) to avoid duplicate skill scans in Cursor.
+- **Post-turn "suggestion" hooks (Cursor `self-improvement.mdc`, Claude Code post-message hooks, etc) MUST NOT suggest doing things R6 / R7 / R9 say to do in-turn** — no end-of-turn "💡 maybe skill-ify this" / "💡 maybe add a lesson" / "💡 maybe write an ADR". If the work is worth doing, the agent does it now under R6/R7/R9 instead of postponing it as advice. Suggestion hooks should only flag things outside ai-collab's own rules (e.g. a one-shot shorter command path).
 
 ### R10. Separate planner, executor, and reviewer roles on risky work
 
