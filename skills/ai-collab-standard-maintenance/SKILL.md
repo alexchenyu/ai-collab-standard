@@ -1,6 +1,6 @@
 ---
 name: ai-collab-standard-maintenance
-description: Maintain AI Collab Docs Standard files consistently. Use when editing .ai-collab governance docs, agent behavior rules, templates, cursorrules.template, init/check scripts, or when the user asks to add AI collaboration rules.
+description: Maintain AI Collab Docs Standard files consistently. Use when editing .ai-collab governance docs, agent behavior rules, templates, Cursor .mdc rules, init/check scripts, or when the user asks to add AI collaboration rules.
 ---
 # AI Collab Standard Maintenance
 
@@ -14,17 +14,17 @@ Use this when changing the AI collaboration standard itself, not ordinary projec
    - information placement / routing -> `docs/ai-collab-doc-governance.md`
    - agent behavior -> `docs/ai-collab-agent-behavior.md`
    - user-facing overview -> `README.md`
-   - generated downstream defaults -> `docs/*.template.md` or `docs/cursorrules.template`
+   - generated downstream defaults -> `docs/*.template.md` or `docs/cursor-rule-core.mdc.template`
    - enforceable checks / bootstrap behavior -> `scripts/bootstrap.sh`, `scripts/init_ai_collab_docs.sh`, or `scripts/check.sh`
 
 2. Keep mirrors synchronized:
    - If editing `docs/ai-collab-doc-governance.md`, apply the same semantic change to `docs/ai-collab-doc-governance.template.md`.
    - If the change affects onboarding, update `README.md`.
-   - If the change affects generated `.cursorrules`, update `docs/cursorrules.template` and keep it within the 10-line budget.
+   - If the change affects generated Cursor rules, update `docs/cursor-rule-core.mdc.template` and keep it within the 60-line `alwaysApply` budget.
 
 3. Prefer active routing rules over vague advice:
    - Say where information goes.
-   - Say what must not go into `.cursorrules`.
+   - Say what must not go into `.cursor/rules/*.mdc`.
    - Say when an agent should create / update a skill instead of only suggesting one.
 
 4. Add automation only when the rule is checkable:
@@ -49,7 +49,7 @@ git -C .ai-collab diff --check
 
 ## Guardrails
 
-- Do not make `.cursorrules` a canonical source.
+- Do not make `.cursor/rules/*.mdc` or legacy `.cursorrules` a canonical source.
 - Do not add long theory to `CLAUDE.md`; it is usually already at the line budget.
 - Do not leave governance docs and templates semantically different.
 - Do not create a new skill for a one-off lesson; route that to `lesson_learned*.md`.

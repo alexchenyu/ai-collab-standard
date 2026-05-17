@@ -78,24 +78,24 @@
  ├── 是"踩过的坑 / 边界条件 / 排障结论"？
  │     └─► lesson_learned.md 对应主题下合并（新增主题要经过评审）
  ├── 是"被用户纠正后，以后大概率还会复用的经验"？
- │     └─► lesson_learned.md 对应主题；不要写进 .cursorrules
+ │     └─► lesson_learned.md 对应主题；不要写进 .cursor/rules/*.mdc
  ├── 是"可重复使用的工具能力 / 多步工作流"？
- │     └─► 主动创建 / 更新 .cursor/skills/；目录特有则进 AGENT.md；浅层文档只留入口
+ │     └─► 主动创建 / 更新 .cursor/skills/；目录特有则进对应目录 AGENTS.md；浅层文档只留入口
  ├── 是"所有 agent 每次都要知道"的稳定规则？
- │     ├── 属于某个子目录独有？── 是 ──► 对应目录 AGENT.md
- │     └── 全仓库通用？────────── 是 ──► CLAUDE.md（优先改已有条目，不要新增段落）
- ├── 是"Cursor 容易忘的一句话提醒"？
- │     └─► .cursorrules（上限 10 行；满了先删再加）
+ │     ├── 属于某个子目录独有？── 是 ──► 对应目录 AGENTS.md
+ │     └── 全仓库通用？────────── 是 ──► AGENTS.md（优先改已有条目，不要新增段落）
+ ├── 是"Cursor 专属且需要自动注入的一句话提醒"？
+ │     └─► .cursor/rules/<name>.mdc（带 frontmatter，保持短小）
  └── 看起来都能放？── 默认放更深层，浅层只留一句导航
 ```
 
 **硬性规则：**
 
 - 同一条事实只能有一个 canonical source。其它文件最多写一句"详见 X"的指针。
-- 在 `CLAUDE.md` / `.cursorrules` 里写具体数字（如 "491K vectors"）永远是错的；数字进 `PROJECT_STATUS.md`。
-- 在 `CLAUDE.md` / `.cursorrules` 里写"我们修过的 bug 具体怎么修"永远是错的；修复结论进 `lesson_learned.md`。
+- 在入口规则文件（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc`）里写具体数字（如 "491K vectors"）永远是错的；数字进 `PROJECT_STATUS.md`。
+- 在入口规则文件里写"我们修过的 bug 具体怎么修"永远是错的；修复结论进 `lesson_learned.md`。
 - 在 `lesson_learned.md` 里写"我们打算未来怎么搞"永远是错的；提案进 `docs/ADR/`。
-- 在 `.cursorrules` 里维护 scratchpad / Lessons / 工具手册永远是错的；scratchpad 本地化，Lessons 进 `lesson_learned.md`，工具进 skills / runbook。
+- 在 `.cursor/rules/*.mdc` 里维护 scratchpad / Lessons / 工具手册永远是错的；scratchpad 本地化，Lessons 进 `lesson_learned.md`，工具进 skills / runbook。
 
 ## 合并与消重流程（反膨胀）
 
@@ -109,7 +109,7 @@
 压缩信号（主动触发压缩）：
 
 - `CLAUDE.md` ≥ 150 行：停止新增，先合并 / 下沉
-- `.cursorrules` ≥ 10 行：停止新增，先删旧
+- `.cursor/rules/00-core.mdc` ≥ 60 行：停止新增，先下沉到 `AGENTS.md` / `lesson_learned.md` / skills
 - `lesson_learned.md` 单主题 ≥ 80 行或总行数 ≥ 600：拆文件
 - 在 `CLAUDE.md` 发现状态快照类数字：立即迁到 `PROJECT_STATUS.md`
 - 在两份文件里发现同一条规则：只保留 canonical source 的那一份
@@ -128,7 +128,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 - 必须进 `.gitignore`；默认不提交、不引用、不作为 canonical source。
 - 只记录当前任务计划、进度、临时假设、待验证点。
 - 任务结束后，把仍有长期价值的结论按路由迁移到 `lesson_learned.md` / ADR / `PROJECT_STATUS.md`，然后清空或删除 scratchpad。
-- 不要把 scratchpad 放进 `.cursorrules`、`CLAUDE.md`、`AGENTS.md`。
+- 不要把 scratchpad 放进 `.cursor/rules/*.mdc`、`CLAUDE.md`、`AGENTS.md`。
 - 引入 `.ai-collab` 后，`init_ai_collab_docs.sh` 会安装内置 `task-scratchpad` skill，用它管理 scratchpad 生命周期。
 
 ## 自我学习流程（Self-Evolution）
@@ -141,7 +141,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `CLAUDE.md` 的高频稳定规则。
 5. 已经被 ADR 固化或规则吸收的 lesson，应从 `lesson_learned.md` 删除或压缩为导航。
 
-禁止路径：用户纠正 → 直接追加到 `.cursorrules`。这会让工具私有文件变成第二套长期记忆。
+禁止路径：用户纠正 → 直接追加到 `.cursor/rules/*.mdc` 或 legacy `.cursorrules`。这会让工具私有文件变成第二套长期记忆。
 
 ## 工具 / 能力注册层
 
@@ -163,7 +163,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 - 根文档只写"有什么能力、从哪里进"，不要复制 skill 正文。
 - 如果项目已有 `.cursor/skills/`，应通过 `.claude/skills -> ../.cursor/skills` symlink 让 Claude Code 读到同一份内容。
 - Codex skills 兼容必须 opt-in：只有显式运行 `init_ai_collab_docs.sh --enable-codex-skills` 时，才创建 `.codex/skills -> ../.cursor/skills`，避免 Cursor 重复扫描多份 skill。
-- 特定目录的工具约束仍可写进该目录 `AGENT.md`；全仓库通用工具能力优先做 skill。
+- 特定目录的工具约束仍可写进该目录 `AGENTS.md`；全仓库通用工具能力优先做 skill。
 
 ## 定期回顾流程
 
@@ -196,10 +196,10 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 ## 按任务类型的最短读取顺序
 
-- 服务或目录级 bugfix：`CLAUDE.md` → 对应目录的 `AGENT.md` → `lesson_learned.md` 对应章节 → 相关 ADR
-- chunk / embedding / ingest 调优：`CLAUDE.md` → 对应专题文档 → `lesson_learned.md` 对应章节 → 相关目录 runbook / ADR
-- 当前部署排障：`docs/PROJECT_STATUS.md` → 对应目录 `AGENT.md` → `lesson_learned.md` 对应章节
-- 纯文档治理：`CLAUDE.md` → 本文 → `docs/ADR/README.md`（若涉及架构决策）→ 相关专题文档
+- 服务或目录级 bugfix：`AGENTS.md` → 对应目录的 `AGENTS.md` → `lesson_learned.md` 对应章节 → 相关 ADR
+- chunk / embedding / ingest 调优：`AGENTS.md` → 对应专题文档 → `lesson_learned.md` 对应章节 → 相关目录 runbook / ADR
+- 当前部署排障：`docs/PROJECT_STATUS.md` → 对应目录 `AGENTS.md` → `lesson_learned.md` 对应章节
+- 纯文档治理：`AGENTS.md` → 本文 → `docs/ADR/README.md`（若涉及架构决策）→ 相关专题文档
 
 ## 各文件优化策略
 
@@ -207,45 +207,45 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 保留原则：
 
-- 只保留高频、稳定、直接影响执行正确性的规则
-- 优先写"必须怎样做"，少写背景和解释
-- 每条都应该经得住"删掉它会不会明显增加出错率"这个测试
-- **不放具体数字、版本号、实例数、端口**——这些进 `PROJECT_STATUS.md`
+- 只做 Claude Code 专属 stub，默认指回 `AGENTS.md`
+- 只有 Claude Code 独有能力或限制才写进这里
+- **不放项目级规则、状态数字、历史经验**——这些分别进 `AGENTS.md`、`PROJECT_STATUS.md`、`lesson_learned.md`
 
 推荐结构：
 
-1. 项目一句话说明
-2. 协作约定（含文档索引指针）
-3. 核心目录
-4. 稳定技术选型（只写"用了什么"，不写"几个实例 / 几张卡"）
-5. 常用命令
-6. 核心约束
-7. 代码约定
+1. 声明 `AGENTS.md` 是 canonical source
+2. 让 Claude Code 先读 `AGENTS.md` / 行为治理文档
+3. Claude Code 专属补充（没有就写"暂无"）
 
 触发精简信号：
 
-- 新增一条规则时，需要先看是否能并入已有条目
-- 出现 3 条以上"只是例子或边角说明"的子弹点时，该下沉到 `lesson_learned.md`
-- 文件开始出现"历史演进 / 提案 / 讨论"时，说明已经写串层了
-- 文件开始出现可精确到个位数的数字（端口号 / 索引大小 / GPU 张数），说明状态快照在污染规则
+- 文件超过 30 行
+- 文件开始复述 `AGENTS.md`
+- 文件开始出现状态数字、历史演进、提案或排障细节
 
 ### `AGENTS.md`
 
-- 它是跨工具入口，不是第二份 `CLAUDE.md`
-- 只负责把 agent 指到真正的 canonical docs
-- 长期保持在 3-6 行，最好一眼扫完
+- 它是跨工具入口和 repo 级规则 canonical source。
+- 放全仓库高频硬约束、文档索引、核心目录、稳定技术选型、常用命令。
+- 不放状态数字、排障流水账、ADR 摘要、临时计划。
+- 根文件建议 ≤ 200 行 / ≤ 8 KiB；含递归子目录 `AGENTS.md` 总和 ≤ 32 KiB。
+
+### `.cursor/rules/*.mdc`
+
+- 它不是第二份 `AGENTS.md`，只是 Cursor 的规则注入层。
+- `00-core.mdc` 应该是 `alwaysApply: true` 的薄指针，指向 `AGENTS.md` 和行为治理文档。
+- 其它 `.mdc` 只放 Cursor 专属、可用 `globs` 或 `alwaysApply` frontmatter 精准控制的提醒。
+- 不做 scratchpad，不维护 Lessons，不写工具手册，不承载项目规则唯一真相。
+
+适合写入：默认语言、极少数 Cursor 容易忘的一句话提醒、稳定的文档分层入口、Cursor 专属交互约束
+
+不适合写入：整段架构说明、长列表代码规范、ADR 摘要、scratchpad、Lessons、工具说明、只有特定工具能看到的重要规则正文、具体数字 / 端口 / 实例数
 
 ### `.cursorrules`
 
-- 它不是第二份 `CLAUDE.md`
-- 它不是 canonical source，只是 Cursor 的超薄提醒层
-- 推荐长期保持在 3-5 条，最好不超过 10 行正文
-- 首行应明确声明"本文件不是 canonical source"
-- 不做 scratchpad，不维护 Lessons，不写工具手册
-
-适合写入：默认语言、极少数 Cursor 容易忘的一句话提醒、稳定的文档分层入口
-
-不适合写入：整段架构说明、长列表代码规范、ADR 摘要、scratchpad、Lessons、工具说明、只有特定工具能看到的重要规则正文、具体数字 / 端口 / 实例数
+- 已废弃；Cursor Agent 模式静默忽略。
+- 新项目不生成；旧项目只能在迁移期保留为 `.cursorrules.legacy.bak`。
+- 迁移时把仍有效且 Cursor 专属的短提醒搬到 `.cursor/rules/*.mdc`，其余按路由进 `AGENTS.md` / `lesson_learned.md` / skills。
 
 ### `.cursor/skills/`
 
@@ -254,7 +254,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 - 如果 skill 里引用项目规则，只写指针，不复制 `CLAUDE.md` / `lesson_learned.md` 正文。
 - 跨工具共享时优先用 symlink，避免 Cursor / Claude Code / Codex 读到两份漂移的 skill；Codex symlink 默认不开，按需 opt-in。
 
-### `AGENT.md`
+### `<dir>/AGENTS.md`
 
 - 只管当前目录，不复述 repo 级规则
 - 内容聚焦：入口文件、核心命令、不能碰的边界、提交流程、常见坑
@@ -290,11 +290,11 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 - 在 `CLAUDE.md` 里堆实现细节，最后变成长手册
 - 在 `CLAUDE.md` 里塞具体数字（数据规模、端口、实例数），每次刷新都要改一大段
-- 在 `.cursorrules` 里复制半份 `CLAUDE.md`
-- 在 `.cursorrules` 里维护 Scratchpad / Lessons / 工具手册
+- 在 `.cursor/rules/*.mdc` 里复制半份 `AGENTS.md`
+- 在 `.cursor/rules/*.mdc` 或 legacy `.cursorrules` 里维护 Scratchpad / Lessons / 工具手册
 - 在 `lesson_learned.md` 里维护 ADR 摘要和未来提案
 - 在 `lesson_learned.md` 里放部署现状
-- 新建一个全仓库 `AGENT.md`，结果内容和 `CLAUDE.md` 高度重复
+- 新建一个全仓库 `AGENT.md`（单数），结果内容和 `AGENTS.md` 高度重复
 - ADR 索引页重新长成第二套 ADR 全文
 - 把可复用的多步工具流程写成规则长文，而不是 skill / runbook
 - 默认重算 `embedding` / chunk / parse result，而不是先复用已有产物
@@ -303,15 +303,15 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 如果只保留 12 条元规则，我建议是这 12 条：
 
-1. `CLAUDE.md` 只放高频稳定规则，单文件 ≤ 150 行。
-2. 根级 `AGENTS.md` 只做跨工具指针，不承载正文，≤ 15 行。
-3. `.cursorrules` 只放极少量持久提醒，≤ 10 行，开头明确"不是 canonical source"。
-4. `AGENT.md` 只在目录存在独有 workflow 时才引入。
+1. 根级 `AGENTS.md` 是 repo 级 canonical source，≤ 200 行 / ≤ 8 KiB。
+2. `CLAUDE.md` 只做 Claude Code stub，≤ 30 行。
+3. `.cursor/rules/00-core.mdc` 只做 Cursor `alwaysApply` 薄指针，≤ 60 行；不再使用 `.cursorrules`。
+4. 子目录 `AGENTS.md` 只在目录存在独有 workflow 时才引入。
 5. `lesson_learned.md` 只放当前仍有效的非显而易见经验，超过 600 行就拆文件。
 6. `PROJECT_STATUS.md` 只放定期刷新的状态快照，超过 4 周没变就说明写错类别了。
 7. ADR 只记录架构决策和提案，不记录日常实现碎片。
 8. 同一条事实只能有一个 canonical source，其它位置最多写一句导航。
 9. 新条目先问"能不能改已有条目"，不能才新增。
 10. Scratchpad 只做本地短期工作记忆，不进 git，不当 canonical source。
-11. 发现适合 skill 化的可复用 agent 工具能力时，主动创建 / 更新 skill，不塞进 `.cursorrules`。
+11. 发现适合 skill 化的可复用 agent 工具能力时，主动创建 / 更新 skill，不塞进 `.cursor/rules/*.mdc`。
 12. 高成本派生成果必须有持久化与失效策略，不能把"重跑"当默认路径。

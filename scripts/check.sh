@@ -256,7 +256,7 @@ check_legacy_cursorrules() {
     fi
     local lines
     lines=$(wc -l < "$file" | tr -d ' ')
-    SOFT_WARNS+=(".cursorrules 仍存在 ($lines 行)；Cursor Agent 模式会静默忽略它。迁移：把内容拷到 .cursor/rules/00-core.mdc，然后删除 .cursorrules 或重命名为 .cursorrules.legacy.bak")
+    SOFT_WARNS+=(".cursorrules 仍存在 ($lines 行)；Cursor Agent 模式会静默忽略它。迁移：按内容类型搬到 AGENTS.md / lesson_learned.md / skills / .cursor/rules/*.mdc，然后删除 .cursorrules 或重命名为 .cursorrules.legacy.bak")
     printf "  \033[33m[WARN]\033[0m .cursorrules 仍存在 (%d 行)，Agent 模式不读取\n" "$lines"
 }
 
@@ -639,7 +639,7 @@ suggest_fix() {
                     printed=1
                 fi
                 printf "  • .cursorrules 仍存在 → Cursor Agent 模式不读取它。迁移：\n"
-                printf "      把内容拷到 \033[1m.cursor/rules/00-core.mdc\033[0m，然后 \033[1mrm .cursorrules\033[0m\n"
+                printf "      按内容类型搬到 \033[1mAGENTS.md / lesson_learned.md / skills / .cursor/rules/*.mdc\033[0m，然后 \033[1mrm .cursorrules\033[0m\n"
                 printf "      或自动迁移：\033[1mbash .ai-collab/scripts/init_ai_collab_docs.sh . --migrate-legacy\033[0m\n"
                 ;;
             *CLAUDE.md*超长*)

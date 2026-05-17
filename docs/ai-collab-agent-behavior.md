@@ -1,7 +1,7 @@
 # AI Agent Behavior Guidelines
 
 > **Scope:** Cross-project, cross-tool behavioral constraints for AI coding agents.
-> **Status:** Canonical source. Other docs (`CLAUDE.md`, `.cursorrules`, `AGENT.md`) only point here, never restate.
+> **Status:** Canonical source. Entry docs (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/*.mdc`, subdirectory `AGENTS.md`) only point here when needed, never restate.
 > **Tradeoff:** Biased toward caution over speed. For trivial tasks (typo fixes, one-line obvious changes), use judgment — not every change needs the full ceremony.
 
 This file is the companion to `ai-collab-doc-governance.md`:
@@ -112,9 +112,9 @@ For any task expected to run >5 minutes (chunking, ingest, eval, large crawls):
 - Resume logic must cross-check the progress file against **actual output files**, not trust either alone.
 - Print periodic status (every N items or every M seconds) so a human or polling agent can detect stalls.
 
-### R4. Don't grow `CLAUDE.md` / `.cursorrules` to "remember" lessons
+### R4. Don't grow entry rules to "remember" lessons
 
-When you discover a new gotcha, the **default** destination is `lesson_learned*.md` under the matching topic. Promotion to `CLAUDE.md` requires:
+When you discover a new gotcha, the **default** destination is `lesson_learned*.md` under the matching topic. Promotion to `AGENTS.md` requires:
 
 - The rule applies to >50% of future tasks, **and**
 - Forgetting it causes high-severity errors (data corruption, prod outage, silent quality regression).
@@ -137,11 +137,11 @@ For multi-step tasks, keeping a lightweight plan / progress log can help preserv
 - Scratchpad content is never canonical source and must not be committed.
 - Keep only current task plan, progress, temporary assumptions, and verification checkpoints there.
 - At task end, migrate durable conclusions through `ai-collab-doc-governance.md`: lessons to `lesson_learned*.md`, decisions to ADR, status to `PROJECT_STATUS.md`; then clear or delete the scratchpad.
-- Never use `.cursorrules` as scratchpad.
+- Never use `.cursor/rules/*.mdc` (or legacy `.cursorrules`) as scratchpad.
 
 ### R8. Learn from corrections through the lesson route
 
-When the user corrects you, or you discover a reusable gotcha while fixing your own mistake, do not append it to `.cursorrules`.
+When the user corrects you, or you discover a reusable gotcha while fixing your own mistake, do not append it to `.cursor/rules/*.mdc` or legacy `.cursorrules`.
 
 - If it is not reusable, just acknowledge it in the current work.
 - If it is reusable, merge it into the matching `lesson_learned*.md` topic.
@@ -154,7 +154,7 @@ If a workflow is reusable and needs multiple commands, tools, examples, or resou
 - Use `.cursor/skills/<name>/SKILL.md` for reusable agent capabilities.
 - When you notice a suitable skill opportunity during implementation, create or update the skill in the same turn if it is small and clearly scoped.
 - Ask first if the skill would introduce new dependencies, encode project policy you are unsure about, or require broad restructuring.
-- Keep `CLAUDE.md`, `.cursorrules`, and `AGENTS.md` as entry points, not tool manuals.
+- Keep `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/*.mdc` as entry points, not tool manuals.
 - Prefer a shared `.claude/skills -> ../.cursor/skills` symlink when Claude Code needs the same capabilities.
 - Enable Codex skills only by explicit opt-in (`init_ai_collab_docs.sh --enable-codex-skills`) to avoid duplicate skill scans in Cursor.
 - **Post-turn "suggestion" hooks (Cursor `self-improvement.mdc`, Claude Code post-message hooks, etc) MUST NOT suggest doing things R6 / R7 / R9 say to do in-turn** — no end-of-turn "💡 maybe skill-ify this" / "💡 maybe add a lesson" / "💡 maybe write an ADR". If the work is worth doing, the agent does it now under R6/R7/R9 instead of postponing it as advice. Suggestion hooks should only flag things outside ai-collab's own rules (e.g. a one-shot shorter command path).
@@ -181,7 +181,7 @@ Healthy signals:
 - **Code is shorter than your first instinct**, because you simplified before submitting.
 - **Re-runs of expensive pipelines are rare** and always have a stated reason.
 - **Scratchpads disappear after the task**, with durable conclusions routed to the right canonical file.
-- **Reusable workflows become skills proactively**, not longer `.cursorrules` prose or end-of-task suggestions.
+- **Reusable workflows become skills proactively**, not longer `.cursor/rules/*.mdc` prose or end-of-task suggestions.
 
 Unhealthy signals (the rules are not landing):
 
@@ -190,7 +190,7 @@ Unhealthy signals (the rules are not landing):
 - "Done" is declared without a verification step.
 - Same fact appears in `CLAUDE.md` and `lesson_learned*.md` with slightly different wording.
 - Embeddings / chunks regenerated because nobody checked the existing output.
-- `.cursorrules` contains a task plan, Lessons log, or tool manual.
+- `.cursor/rules/*.mdc` or legacy `.cursorrules` contains a task plan, Lessons log, or tool manual.
 - A repeated multi-step workflow keeps getting re-explained in chat instead of being captured as a skill.
 
 ---

@@ -161,7 +161,7 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --migrate-legacy --force
 ```
 
 `--migrate-legacy` 会：
-- 把 `.cursorrules` 重命名为 `.cursorrules.legacy.bak`（你需手动把内容拷到 `.cursor/rules/00-core.mdc`）
+- 把 `.cursorrules` 重命名为 `.cursorrules.legacy.bak`（你需手动按类型迁到 `AGENTS.md` / `lesson_learned.md` / skills / `.cursor/rules/*.mdc`）
 - 把所有子目录 `AGENT.md` 重命名为 `AGENTS.md`
 - 检测过长 CLAUDE.md 并提示把内容迁到 AGENTS.md
 

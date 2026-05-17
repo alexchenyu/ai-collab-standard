@@ -466,16 +466,16 @@ maybe_migrate_legacy() {
 
     note "migration: scanning legacy artifacts in $TARGET_DIR"
 
-    # 1. .cursorrules is silently ignored in Cursor Agent mode now; migrate to
-    #    .cursor/rules/00-core.mdc. We do not delete the old file (user may want
-    #    to copy content manually); we just rename it to .cursorrules.legacy.bak
-    #    so it stops being loaded and FORCE-overwrite of the new layout proceeds.
+    # 1. .cursorrules is silently ignored in Cursor Agent mode now. We do not
+    #    delete the old file (user may want to route content manually); we just
+    #    rename it to .cursorrules.legacy.bak so FORCE-overwrite of the modern
+    #    .cursor/rules/*.mdc layout can proceed.
     if [[ -f "$TARGET_DIR/.cursorrules" && ! -f "$TARGET_DIR/.cursorrules.legacy.bak" ]]; then
         if (( DRY_RUN == 1 )); then
             note "(dry-run) would archive .cursorrules -> .cursorrules.legacy.bak"
         else
             mv "$TARGET_DIR/.cursorrules" "$TARGET_DIR/.cursorrules.legacy.bak"
-            note "migration: archived .cursorrules -> .cursorrules.legacy.bak (review and copy any content into .cursor/rules/00-core.mdc, then delete)"
+            note "migration: archived .cursorrules -> .cursorrules.legacy.bak (review and route content into AGENTS.md, lesson_learned.md, skills, or .cursor/rules/*.mdc)"
         fi
     fi
 

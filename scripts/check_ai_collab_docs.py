@@ -168,7 +168,7 @@ def check_legacy_cursorrules(max_lines: int) -> int:
         print(
             f"\nAI collab docs governance check failed:\n"
             f"- staged {CURSORRULES_PATH} has {lines} lines (> {max_lines}); .cursorrules is legacy.\n"
-            f"- Migrate content to .cursor/rules/00-core.mdc, then `rm .cursorrules`.\n"
+            f"- Route content into AGENTS.md / lesson_learned.md / skills / .cursor/rules/*.mdc, then `rm .cursorrules`.\n"
             f"- One-shot bypass: {ALLOW_LEGACY_CURSORRULES_ENV}=1.",
             file=sys.stderr,
         )

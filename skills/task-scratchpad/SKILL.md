@@ -75,7 +75,7 @@ Before final response:
 
 ## Guardrails
 
-- Do not write scratchpad content into `.cursorrules`.
+- Do not write scratchpad content into `.cursor/rules/*.mdc` or legacy `.cursorrules`.
 - Do not commit scratchpad files.
 - Do not preserve one-off task notes as lessons.
 - Do not create a skill for a one-off workaround.

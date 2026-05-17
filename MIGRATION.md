@@ -58,20 +58,28 @@ cp CLAUDE.md CLAUDE.md.legacy.bak
 The new CLAUDE.md should be a ~30-line stub that says "Read AGENTS.md first".
 Use `.ai-collab/docs/CLAUDE.template.md` as the starting point.
 
-### Step 2: Migrate `.cursorrules` content into `.cursor/rules/00-core.mdc`
+### Step 2: Route `.cursorrules` content into modern locations
 
-Cursor Agent mode silently ignores `.cursorrules`. Move content:
+Cursor Agent mode silently ignores `.cursorrules`. Do not bulk-copy it into
+`00-core.mdc`; route each item by ownership:
+
+- Cross-tool repo rule → `AGENTS.md`
+- Lesson / gotcha → `lesson_learned.md`
+- Reusable workflow → `.cursor/skills/<name>/SKILL.md`
+- Cursor-only short reminder → `.cursor/rules/*.mdc`
+
+For Cursor-only reminders:
 
 ```bash
 mkdir -p .cursor/rules
-# Copy your .cursorrules content + add MDC frontmatter:
+# Keep this tiny; it is injected into every Cursor session.
 cat > .cursor/rules/00-core.mdc <<'EOF'
 ---
 description: Core project context — always inject.
 alwaysApply: true
 ---
 
-(your .cursorrules content here, but trim heavily — this eats every-session token budget)
+Read `AGENTS.md` first. Put durable lessons in `lesson_learned.md`, not here.
 EOF
 rm .cursorrules   # or: mv .cursorrules .cursorrules.legacy.bak
 ```
@@ -175,7 +183,7 @@ make sure CLAUDE.md is a stub (or just link AGENTS.md from CLAUDE.md so
 Claude Code on contributors' laptops sees the same rules).
 
 **Q: My `.cursorrules` is 200 lines of important rules. Where do they go?**
-A: Most should go in `AGENTS.md` (cross-tool). Cursor-specific stuff (e.g.
-"prefer Composer over Chat for X") goes in `.cursor/rules/00-core.mdc`. Truly
-file-type-specific rules go in their own `.cursor/rules/*.mdc` with
+A: Most should go in `AGENTS.md` (cross-tool), `lesson_learned.md` (gotchas),
+or skills (workflows). Cursor-specific stuff (e.g. "prefer Composer over Chat
+for X") goes in `.cursor/rules/*.mdc`; file-type-specific rules should use
 `globs: ["**/*.tsx"]` instead of `alwaysApply: true`.
