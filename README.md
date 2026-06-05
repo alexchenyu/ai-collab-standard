@@ -86,6 +86,19 @@
 
 推荐作为 Git Submodule 引入到业务项目的 `.ai-collab/` 目录下。
 
+> **生产项目导入前先 pin 一个 reviewed commit。** `bootstrap.sh` / `git submodule add`
+> 会拿到当时的上游 HEAD，但真正的可复现边界是父仓库提交里的 submodule gitlink。
+> 如果上游文档或脚本需要本地修正，先 fork，再把 `.ai-collab` 指向 fork 和已审核的 commit。
+>
+> ```bash
+> git submodule add https://github.com/alexchenyu/ai-collab-standard.git .ai-collab
+> git -C .ai-collab checkout <reviewed-commit-sha>
+> # 如需 fork：
+> git submodule set-url .ai-collab git@github.com:<org>/ai-collab-standard.git
+> git add .gitmodules .ai-collab
+> git commit -m "chore: pin ai-collab standard"
+> ```
+
 > **新 contributor clone 已配置好的项目时**：git 不会自动跑任何脚本（安全设计）。
 > 必须在**父仓库根目录**手动一次性执行下面的命令 —— **不是在 `.ai-collab/` 子目录里跑**（之后都是增量）。
 >

@@ -169,7 +169,7 @@ LAYER 3 — Tool-private / Project-private（不跨工具，不跨项目）
 
 压缩信号（主动触发压缩）：
 
-- `CLAUDE.md` ≥ 150 行：停止新增，先合并 / 下沉
+- `CLAUDE.md` > 30 行：停止新增，先合并 / 下沉到 `AGENTS.md` 或更深层文档
 - `.cursor/rules/00-core.mdc` ≥ 60 行：停止新增，先下沉到 `AGENTS.md` / `lesson_learned.md` / skills
 - `lesson_learned.md` 单主题 ≥ 80 行或总行数 ≥ 600：拆文件
 - 在 `CLAUDE.md` 发现状态快照类数字：立即迁到 `PROJECT_STATUS.md`
@@ -199,7 +199,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 1. 先判断是否可复用：未来同类任务是否大概率再次遇到？
 2. 不可复用：只在当前对话说明，不写入协作文档。
 3. 可复用但低频：合并进 `lesson_learned.md` 对应主题，优先改已有条目。
-4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `CLAUDE.md` 的高频稳定规则。
+4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `AGENTS.md` 的高频稳定规则。
 5. 已经被 ADR 固化或规则吸收的 lesson，应从 `lesson_learned.md` 删除或压缩为导航。
 
 禁止路径：用户纠正 → 直接追加到 `.cursor/rules/*.mdc` 或 legacy `.cursorrules`。这会让工具私有文件变成第二套长期记忆。
@@ -326,7 +326,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 - 只记录"未来大概率还会再次派上用场"的东西
 - 按主题组织，不按时间顺序追加
-- 如果某条已经进入 `CLAUDE.md` 或 ADR，就从这里删掉
+- 如果某条已经进入 `AGENTS.md` 或 ADR，就从这里删掉
 - 不记录项目当前状态（数据规模、端口）——那是 `PROJECT_STATUS.md` 的事
 
 拆分阈值：

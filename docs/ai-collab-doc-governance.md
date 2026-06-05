@@ -46,6 +46,67 @@
 
 核心原则：**一条信息只能有一个 canonical source。其它位置如果要引用，只能写"见 X"形式的一句话导航；禁止把同一条结论复制两份。** AGENTS.md 是默认入口；只有真正属于某个工具的特化（例如 Claude Code 的 `/agents` 子代理参数）才进 CLAUDE.md / `.cursor/rules/`。
 
+## 三层模型：`.cursor/` ↔ `.ai-collab/` 怎么协同
+
+`.cursor/` 是 **Cursor 的工具配置层**，`.ai-collab/` 是 **跨项目共享层**。两者通过 install / symlink / pointer 协同，不直接覆盖。
+
+```
+LAYER 1 — Canonical（跨工具 / 跨项目）
+  AGENTS.md (root)                          ← cross-tool standard
+  .ai-collab/docs/*                         ← behavior / governance / glossary
+  .ai-collab/skills/<name>/                 ← bundled cross-project skills
+  .ai-collab/scripts/*                      ← init / check / hooks / migration
+
+         ↓ install (cp -R) / symlink / point-to
+
+LAYER 2 — Distribution（工具特定，但内容由 Layer 1 决定）
+  CLAUDE.md (≤30 行 stub → AGENTS.md)
+  .cursor/rules/00-core.mdc (≤60 行 stub → AGENTS.md)
+  .cursor/skills/<bundled>/                 ← cp from .ai-collab/skills/
+  .cursor/hooks.json                        ← from .ai-collab/templates/cursor-hooks.json.template
+  .claude/skills → .cursor/skills           ← symlink
+  .codex/skills → .cursor/skills            ← opt-in symlink (auto if ~/.codex/ exists)
+  .git/hooks/pre-commit                     ← from .ai-collab/scripts/pre-commit.sh
+
+         +
+
+LAYER 3 — Tool-private / Project-private（不跨工具，不跨项目）
+  .cursor/rules/<other>.mdc                 ← Cursor-only project rules
+  .cursor/skills/<project-only>/            ← skill 死绑本项目业务/路径
+  .cursor/plans/, .cursor/.gitignore        ← Cursor 私产
+  .claude/settings.local.json               ← user prefs (gitignore)
+  ~/.codex/config.toml                      ← user-level (~ home)
+```
+
+### Skill 归属判定法（4 个问题）
+
+判断一个 skill 该住 `.ai-collab/skills/`（canonical，自动分发）还是 `.cursor/skills/`（项目本地）：
+
+1. **换个项目还有用吗？** 是 → `.ai-collab/skills/`；否 → `.cursor/skills/`
+2. **涉及具体业务术语 / 绝对路径吗？** 是 → `.cursor/skills/`；否 → `.ai-collab/skills/`
+3. **会用在多个 AI 工具吗？** 是 → `.ai-collab/skills/`（自动 propagate）；否（只 Cursor 用）→ `.cursor/skills/`
+4. **本地修改值得贡献给 .ai-collab 吗？** 是 → `git mv .cursor/skills/X .ai-collab/skills/X` 然后 PR；否 → 留 `.cursor/skills/`
+
+通用 skill（如 `task-scratchpad` / `standard-migration` / `write-a-skill` / `caveman` / `ai-collab-standard-maintenance`）住 `.ai-collab/skills/`；项目专属 skill（绑死业务路径如 `qwen-chunking-runbook` / `rag-sync-pipeline`）住 `.cursor/skills/`。
+
+### 分发机制铁律
+
+- **Bundled skill 永远总是同步**：`init_ai_collab_docs.sh` 用 `diff -rq` 检测，差异时 `cp -R` 覆盖。无需 `--force`。每个 bundled SKILL.md 顶部要有 canonical banner：
+  > **Canonical source: `.ai-collab/skills/<name>/SKILL.md`**. The copy under `.cursor/skills/<name>/SKILL.md` is auto-installed and **will be overwritten**. Edit upstream and PR back.
+- **Layout 文件用 `--force` 重生成**（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/00-core.mdc`），用户内容文件**永不**被 `--force` 覆盖（`lesson_learned.md` / `PROJECT_STATUS.md` / `PROJECT_GLOSSARY.md` / `ADR/README.md` / 子目录 `AGENTS.md`）。
+- **从 `.cursor/` 提升到 `.ai-collab/`**：`git mv .cursor/skills/X .ai-collab/skills/X` → 加 banner → 跑 init 把它装回 `.cursor/skills/X` → PR `.ai-collab` repo。
+- **从 `.ai-collab/` 反向 fork 到本地**：把 `.ai-collab/skills/X/SKILL.md` 改一改成项目专属版本另存到 `.cursor/skills/X-local/`，**不要原地改 `.cursor/skills/X/`**（下次 init 会被冲掉）。
+
+### Hook 协同（pre-commit / Cursor afterFileEdit）
+
+| Hook 类型 | 触发时机 | 谁装它 | 触发什么 |
+|---|---|---|---|
+| `.git/hooks/pre-commit` | `git commit` 时 | `--install-hook` | `check_ai_collab_docs.py`（轻量），失败阻断 commit |
+| `.cursor/hooks.json` `afterFileEdit` | Cursor agent 编辑文件后 | `--install-cursor-hook` | `cursor-doc-check-hook.sh` → 仅治理文件触发 `check_ai_collab_docs.py`，**绝不阻断**（exit 0） |
+| `~/.cursor/hooks.json` | Cursor 全局 | 用户自管 | 项目级 hook 之前先跑 |
+
+两个 hook 都用同一个轻量 Python checker（`.ai-collab/scripts/check_ai_collab_docs.py`），不调用重的 `check.sh`（后者扫全仓）。
+
 ## 分层结论
 
 | 文件 | 作用 | 应该放什么 | 不该放什么 | 建议体积 |
@@ -108,7 +169,7 @@
 
 压缩信号（主动触发压缩）：
 
-- `CLAUDE.md` ≥ 150 行：停止新增，先合并 / 下沉
+- `CLAUDE.md` > 30 行：停止新增，先合并 / 下沉到 `AGENTS.md` 或更深层文档
 - `.cursor/rules/00-core.mdc` ≥ 60 行：停止新增，先下沉到 `AGENTS.md` / `lesson_learned.md` / skills
 - `lesson_learned.md` 单主题 ≥ 80 行或总行数 ≥ 600：拆文件
 - 在 `CLAUDE.md` 发现状态快照类数字：立即迁到 `PROJECT_STATUS.md`
@@ -138,7 +199,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 1. 先判断是否可复用：未来同类任务是否大概率再次遇到？
 2. 不可复用：只在当前对话说明，不写入协作文档。
 3. 可复用但低频：合并进 `lesson_learned.md` 对应主题，优先改已有条目。
-4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `CLAUDE.md` 的高频稳定规则。
+4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `AGENTS.md` 的高频稳定规则。
 5. 已经被 ADR 固化或规则吸收的 lesson，应从 `lesson_learned.md` 删除或压缩为导航。
 
 禁止路径：用户纠正 → 直接追加到 `.cursor/rules/*.mdc` 或 legacy `.cursorrules`。这会让工具私有文件变成第二套长期记忆。
@@ -265,7 +326,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 
 - 只记录"未来大概率还会再次派上用场"的东西
 - 按主题组织，不按时间顺序追加
-- 如果某条已经进入 `CLAUDE.md` 或 ADR，就从这里删掉
+- 如果某条已经进入 `AGENTS.md` 或 ADR，就从这里删掉
 - 不记录项目当前状态（数据规模、端口）——那是 `PROJECT_STATUS.md` 的事
 
 拆分阈值：
