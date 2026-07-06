@@ -219,7 +219,7 @@ bash .ai-collab/scripts/init_ai_collab_docs.sh . --force  # 用新模板覆盖�
 bash .ai-collab/scripts/check.sh
 ```
 
-包含 14 类检查：行数 / TODO 残留 / 状态污染 / lesson 主题长度 / 子目录 AGENTS.md 迁移 / Cursor MDC alwaysApply / 旧 `.cursorrules` 残留 / Codex 32 KiB 预算 / CLAUDE.md 桩文件 / 行为约束指针 / 共享语言锚点 / Skills 符号链接 / Codex skills opt-in / 本地 scratchpad / 跨文件重复。
+包含 16 类检查：体积 / 状态快照污染 / TODO 残留 / lesson 主题长度 / 子目录 AGENTS.md 迁移 / Cursor MDC alwaysApply / 旧 `.cursorrules` 残留 / Codex 32 KiB 预算 / CLAUDE.md 桩文件 / 行为约束指针 / 共享语言锚点 / Skills 跨 agent 可见性 / 内置 Skills 安装 / Codex skills opt-in / 本地 scratchpad / 跨文件重复。
 
 退出码：`0` 全过 / `1` 硬失败（pre-commit 阻断）/ `2` 仅软警告。
 
