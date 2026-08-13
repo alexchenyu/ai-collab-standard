@@ -12,9 +12,11 @@ Layout (post-2026 cross-tool standard):
 from __future__ import annotations
 
 import argparse
+import datetime
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 AGENTS_PATH = "AGENTS.md"
@@ -72,6 +74,26 @@ def line_count(text: str) -> int:
     return len(text.splitlines()) if text else 0
 
 
+def log_bypass(allow_env: str, detail: str) -> None:
+    """Append one line to the bypass ledger (.ai-collab/runtime/bypass.log).
+
+    Escape hatches must leave a trace: silently lowering the quality bar is
+    how gates rot. The periodic review reads this ledger — a gate bypassed
+    3+ times means either widen the limit deliberately or fix the root cause.
+    Never raises: the ledger must not break the check itself.
+    """
+    try:
+        result = run_git(["rev-parse", "--show-toplevel"], check=False)
+        root = Path(result.stdout.strip()) if result.returncode == 0 else Path.cwd()
+        ledger = root / ".ai-collab" / "runtime" / "bypass.log"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with ledger.open("a", encoding="utf-8") as fh:
+            fh.write(f"{stamp} {allow_env} {detail}\n")
+    except Exception:
+        pass
+
+
 def _check_size(
     path: str,
     label: str,
@@ -83,10 +105,6 @@ def _check_size(
         _vprint(f"[ai-collab] no staged {path} change; skipping")
         return 0
 
-    if os.environ.get(allow_env) == "1":
-        _vprint(f"[ai-collab] {allow_env}=1; allowing oversized {path}")
-        return 0
-
     staged_text = read_staged_file(path)
     if staged_text is None:
         _vprint(f"[ai-collab] staged {path} was deleted; skipping line-count check")
@@ -95,6 +113,11 @@ def _check_size(
     lines = line_count(staged_text)
     if lines <= max_lines:
         _vprint(f"[ai-collab] staged {path} ok: {lines}/{max_lines} lines")
+        return 0
+
+    if os.environ.get(allow_env) == "1":
+        _vprint(f"[ai-collab] {allow_env}=1; allowing oversized {path}")
+        log_bypass(allow_env, f"{path} {lines}/{max_lines}")
         return 0
 
     print("\nAI collab docs governance check failed:", file=sys.stderr)
@@ -146,6 +169,7 @@ def check_legacy_cursorrules(max_lines: int) -> int:
 
     if os.environ.get(ALLOW_LEGACY_CURSORRULES_ENV) == "1":
         _vprint(f"[ai-collab] {ALLOW_LEGACY_CURSORRULES_ENV}=1; allowing legacy .cursorrules")
+        log_bypass(ALLOW_LEGACY_CURSORRULES_ENV, CURSORRULES_PATH)
         return 0
 
     staged_text = read_staged_file(CURSORRULES_PATH)

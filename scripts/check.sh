@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # AI 协作文档治理健康检查（新架构：AGENTS.md canonical / Cursor MDC / 子目录 AGENTS.md）
 # 用法：
-#   bash .ai-collab/scripts/check.sh [TARGET_DIR]
+#   bash .ai-collab/scripts/check.sh [TARGET_DIR] [--json]
 #   默认 TARGET_DIR 是当前目录的 git 仓库根
+#   --json：stdout 输出机器可读结果 {"passed":N,"warns":[...],"fails":[...],"exit_code":N}
+#           （人读输出转到 stderr；退出码语义不变），供趋势追踪 / 季度回顾使用
 #
 # 检查项：
 #   1. 主文件行数 / 字节数 vs 目标上限（软警告 / 硬失败）
@@ -31,8 +33,38 @@ if (( ${BASH_VERSINFO[0]:-0} < 3 )); then
     exit 1
 fi
 
-TARGET_DIR="${1:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+TARGET_DIR=""
+JSON_MODE=0
+for arg in "$@"; do
+    case "$arg" in
+        --json) JSON_MODE=1 ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) TARGET_DIR="$arg" ;;
+    esac
+done
+TARGET_DIR="${TARGET_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+# --json 模式：人读输出全部转 stderr，stdout 只留最终 JSON（fd3 暂存真 stdout）。
+if (( JSON_MODE == 1 )); then
+    exec 3>&1 1>&2
+fi
+
+# 逃生舱留痕：检测到 AI_COLLAB_ALLOW_*=1 时写入 bypass ledger。
+# 静默降低质量 bar 是 gate 腐烂的开始；定期回顾读这份账本，同一 gate 被绕 ≥3 次
+# 就该正式调宽上限（deliberate）或修根因。仅在目标项目内嵌 .ai-collab 时记录。
+log_bypass_envs() {
+    [[ -d "$TARGET_DIR/.ai-collab" ]] || return 0
+    local var stamp ledger
+    ledger="$TARGET_DIR/.ai-collab/runtime/bypass.log"
+    stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    while IFS= read -r var; do
+        [[ -n "$var" ]] || continue
+        mkdir -p "$(dirname "$ledger")"
+        printf '%s %s check.sh-run\n' "$stamp" "$var" >> "$ledger"
+    done < <(env | sed -n 's/^\(AI_COLLAB_ALLOW_[A-Z0-9_]*\)=1$/\1/p')
+}
+log_bypass_envs
 
 # New layout limits (AGENTS.md is canonical, CLAUDE.md is stub).
 AGENTS_MAX=200                # was 15 (thin pointer); now canonical
@@ -713,23 +745,46 @@ suggest_fix() {
     done
 }
 
+EXIT_CODE=0
 if (( ${#HARD_FAILS[@]} > 0 )); then
     printf "\n\033[31m硬失败列表：\033[0m\n"
     for f in "${HARD_FAILS[@]}"; do
         printf "  - %s\n" "$f"
     done
     suggest_fix HARD_FAILS
-    exit 1
-fi
-
-if (( ${#SOFT_WARNS[@]} > 0 )); then
+    EXIT_CODE=1
+elif (( ${#SOFT_WARNS[@]} > 0 )); then
     printf "\n\033[33m软警告列表：\033[0m\n"
     for w in "${SOFT_WARNS[@]}"; do
         printf "  - %s\n" "$w"
     done
     suggest_fix SOFT_WARNS
-    exit 2
+    EXIT_CODE=2
+else
+    printf "\n\033[32m全部通过\033[0m\n"
 fi
 
-printf "\n\033[32m全部通过\033[0m\n"
-exit 0
+# --json：把三组结果以 NUL 分隔喂给 python 组装 JSON，写回真 stdout (fd3)。
+if (( JSON_MODE == 1 )); then
+    {
+        for p in ${PASSED[@]+"${PASSED[@]}"}; do printf 'P%s\0' "$p"; done
+        for w in ${SOFT_WARNS[@]+"${SOFT_WARNS[@]}"}; do printf 'W%s\0' "$w"; done
+        for f in ${HARD_FAILS[@]+"${HARD_FAILS[@]}"}; do printf 'F%s\0' "$f"; done
+    } | EXIT_CODE="$EXIT_CODE" python3 -c '
+import json, os, sys
+passed, warns, fails = [], [], []
+buckets = {"P": passed, "W": warns, "F": fails}
+for item in sys.stdin.buffer.read().split(b"\0"):
+    if item:
+        s = item.decode("utf-8", "replace")
+        buckets[s[0]].append(s[1:])
+print(json.dumps({
+    "passed": len(passed),
+    "warns": warns,
+    "fails": fails,
+    "exit_code": int(os.environ.get("EXIT_CODE", "0")),
+}, ensure_ascii=False))
+' >&3
+fi
+
+exit "$EXIT_CODE"

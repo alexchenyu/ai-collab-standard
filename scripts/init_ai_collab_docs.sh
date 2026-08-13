@@ -39,8 +39,9 @@ Options:
                          docs/ADR/README.md, subdir AGENTS.md) once they exist.
   --dry-run              Print planned actions without writing files
   --install-hook         Install pre-commit hook into .git/hooks (copies pre-commit.sh)
-  --install-cursor-hook  Install .cursor/hooks.json (afterFileEdit governance check;
-                         see .ai-collab/templates/cursor-hooks.json.template)
+  --install-cursor-hook  Install .cursor/hooks.json (afterFileEdit governance check +
+                         beforeShellExecution shell-discipline gate; see
+                         .ai-collab/templates/cursor-hooks.json.template)
   --enable-codex-skills  Opt in to .codex/skills -> ../.cursor/skills symlink
                          (auto-detected if ~/.codex/ exists; pass --no-codex-skills to override)
   --no-codex-skills      Disable Codex skills auto-symlink even if ~/.codex/ exists
@@ -552,6 +553,14 @@ render_template_protected \
     "$TEMPLATE_DIR/ADR-README.template.md" \
     "$TARGET_DIR/docs/ADR/README.md"
 
+# Quality gates inventory: which deterministic constraints exist, at which
+# stage, how strict, and what the escape hatch is. User content after first
+# scaffold (projects register their own lint/test/CI gates here).
+render_template_protected \
+    "$TEMPLATE_DIR/QUALITY_GATES.template.md" \
+    "$TARGET_DIR/docs/QUALITY_GATES.md" \
+    "{{PROJECT_NAME}}=$PROJECT_NAME"
+
 # Governance + ADR template are managed docs (track upstream); --force ok.
 render_template \
     "$TEMPLATE_DIR/ai-collab-doc-governance.template.md" \
@@ -889,7 +898,7 @@ if (( INSTALL_CURSOR_HOOK == 1 )); then
             note "Cursor hooks.json already exists at $CURSOR_HOOK_DST; use --force to overwrite"
         else
             cp "$CURSOR_HOOK_TPL" "$CURSOR_HOOK_DST"
-            note "installed Cursor hooks: $CURSOR_HOOK_DST (afterFileEdit -> cursor-doc-check-hook.sh)"
+            note "installed Cursor hooks: $CURSOR_HOOK_DST (afterFileEdit doc check + beforeShellExecution shell guard)"
         fi
     fi
 fi

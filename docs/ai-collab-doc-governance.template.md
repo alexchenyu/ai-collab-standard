@@ -142,6 +142,9 @@ LAYER 3 — Tool-private / Project-private（不跨工具，不跨项目）
  │     └─► lesson_learned.md 对应主题；不要写进 .cursor/rules/*.mdc
  ├── 是"可重复使用的工具能力 / 多步工作流"？
  │     └─► 主动创建 / 更新 .cursor/skills/；目录特有则进对应目录 AGENTS.md；浅层文档只留入口
+ ├── 是"可机器判定的必守规则"？
+ │     └─► 写成 gate（hook / check.sh 检查项 / lint 规则），文档只留一句指针；
+ │         prose 版规则视为 gate 建成前的临时态（gate 清单见 docs/QUALITY_GATES.md）
  ├── 是"所有 agent 每次都要知道"的稳定规则？
  │     ├── 属于某个子目录独有？── 是 ──► 对应目录 AGENTS.md
  │     └── 全仓库通用？────────── 是 ──► AGENTS.md（优先改已有条目，不要新增段落）
@@ -201,6 +204,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 3. 可复用但低频：合并进 `lesson_learned.md` 对应主题，优先改已有条目。
 4. 高频且高风险：先写 `lesson_learned.md`，再评估是否提升为 `AGENTS.md` 的高频稳定规则。
 5. 已经被 ADR 固化或规则吸收的 lesson，应从 `lesson_learned.md` 删除或压缩为导航。
+6. 同一条 lesson 被违反 ≥2 次且可机器判定：升级为 gate（hook / check 检查项 / lint 规则），原 prose 压缩为指向 gate 的一句导航。防止"lesson 越写越长但 agent 照犯"。
 
 禁止路径：用户纠正 → 直接追加到 `.cursor/rules/*.mdc` 或 legacy `.cursorrules`。这会让工具私有文件变成第二套长期记忆。
 
@@ -236,6 +240,7 @@ Scratchpad 只解决"当前任务怎么推进"的问题，不解决"项目长期
 4. 检查 `PROJECT_STATUS.md` 是否真的是最新的；如果超过 1 个月没动，找出现在到底谁在负责。
 5. 清理本地 scratchpad：仍有效的结论完成归档，其余删除。
 6. 检查 `.cursor/skills/` 与 `.claude/skills` 是否仍指向同一份能力入口；若项目启用了 Codex skills，也检查 `.codex/skills` symlink。
+7. 扫 `.ai-collab/runtime/bypass.log`（逃生舱账本）：同一 gate 被绕 ≥3 次 → 要么正式调宽上限（改 check 脚本常量，deliberate decision），要么查根因修掉。不允许"一直绕着走"成为常态；处理完可清空账本。
 
 ## 高成本派生成果治理
 

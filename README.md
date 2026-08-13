@@ -2,10 +2,11 @@
 
 一套用于规范和管理项目中 AI 协作文档（`AGENTS.md`、`CLAUDE.md`、`.cursor/rules/*.mdc`、`lesson_learned.md`、`docs/ADR/` 等）的通用模板、治理流程和自动化护栏。**遵循 2026 年跨工具事实标准**：AGENTS.md 作为 canonical（被 Codex、Cursor、GitHub Copilot、Windsurf、Amp、Devin 等原生支持），其它文件作为薄入口或工具特化补丁。
 
-包含两个正交维度：
+包含三个正交维度：
 
 - **信息治理**（`docs/ai-collab-doc-governance.md`）：信息放哪、怎么不膨胀、canonical source 怎么分配。
 - **行为约束**（`docs/ai-collab-agent-behavior.md`）：agent 应该怎么思考与动手 —— 思考前 / 简洁优先 / 精准修改 / 目标驱动 / 临时工作记忆 / 自我学习。受 [andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills) 与 [devin.cursorrules](https://github.com/grapeot/devin.cursorrules) 启发，按本仓库实战经验扩展。
+- **质量约束（quality gates）**：可机检的规则不停留在 prose，落成确定性 gate —— pre-commit 检查、Cursor `beforeShellExecution` shell 纪律 hook、逃生舱留痕账本；每个项目用 `docs/QUALITY_GATES.md` 登记自己的约束面。
 
 ## 为什么需要这个
 
@@ -32,6 +33,7 @@
 | `docs/PROJECT_GLOSSARY.md` | 共享术语 | 引用即可 | ≤ 150 行 |
 | `docs/PROJECT_STATUS.md` | 状态快照（数字 / 端口 / 实例） | 引用即可 | ≤ 120 行 |
 | `docs/ADR/*.md` | 架构决策 | 引用即可 | 一决策一文件 |
+| `docs/QUALITY_GATES.md` | 质量约束清单（gate / 阶段 / 硬软 / 逃生舱） | 引用即可 | 纯表格 |
 | `.cursor/skills/` (+ `.claude/skills` symlink) | Agent skills | Cursor + Claude Code | 一 skill 一目录 |
 
 **Codex 总预算**：所有 AGENTS.md（根 + 递归子目录）累加 ≤ 32 KiB（默认 `project_doc_max_bytes`），超出 Codex 会截断深层文件。可在 `~/.codex/config.toml` 调高。
@@ -52,6 +54,8 @@
 │   ├── check_ai_collab_docs.py      # Python 轻量 pre-commit gate
 │   ├── install_hooks.sh             # 装 Python pre-commit hook
 │   ├── pre-commit.sh                # Bash pre-commit hook（跑 check.sh）
+│   ├── cursor-doc-check-hook.sh     # Cursor afterFileEdit 文档治理检查
+│   ├── cursor-shell-guard-hook.sh   # Cursor beforeShellExecution shell 纪律 gate
 │   └── split_lesson.sh              # 自动拆分 lesson_learned.md
 ├── skills/
 │   └── task-scratchpad/             # Devin-style 本地短期工作记忆 skill
@@ -67,7 +71,8 @@
     ├── PROJECT_STATUS.template.md            # 状态快照模板
     ├── PROJECT_GLOSSARY.template.md          # 共享语言模板
     ├── ADR-000-template.md                   # 单份 ADR 模板
-    └── ADR-README.template.md                # ADR 索引模板
+    ├── ADR-README.template.md                # ADR 索引模板
+    └── QUALITY_GATES.template.md             # 质量约束清单模板
 ```
 
 ## 跨平台 / 跨工具兼容性

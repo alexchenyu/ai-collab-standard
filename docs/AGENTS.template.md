@@ -57,6 +57,7 @@ bash .ai-collab/scripts/check.sh
 | Cursor 总是注入的规则 | `.cursor/rules/00-core.mdc`（指针 + alwaysApply） |
 | 目录级 runbook | 各子目录 `AGENTS.md` |
 | Agent skills（含 `task-scratchpad`） | `.cursor/skills/` |
+| 质量约束清单（gate / 阶段 / 逃生舱） | `docs/QUALITY_GATES.md` |
 | 文档治理规范 | `.ai-collab/docs/ai-collab-doc-governance.md` |
 
 ## 核心目录

@@ -169,6 +169,14 @@ For broad, risky, or ambiguous work, explicitly split the loop even if one agent
 
 Use subagents only when the split has concrete value, such as parallel exploration, independent review, or isolated experiments.
 
+### R11. Machine-checkable rules must become gates
+
+Prose rules only work when the agent remembers them; deterministic gates work every time. Before adding a new `Rn.` rule or lesson, first ask: **can this be a hook / check / lint rule instead?** If yes, implement the gate and keep only a one-line pointer in prose (see `ai-collab-doc-governance.md` § 新条目路由流程 and the project's `docs/QUALITY_GATES.md` inventory).
+
+- Existing example: R6 (uv-only) is enforced by `scripts/cursor-shell-guard-hook.sh` (Cursor `beforeShellExecution`), not by hoping the agent read this file.
+- Escape hatches (`AI_COLLAB_ALLOW_*`, `.ai-collab-shell-deny.txt`) must leave a trace in `.ai-collab/runtime/bypass.log`; silently lowering the bar is how gates rot.
+- In the R10 split, the Reviewer's **first step is running the gates** (`check.sh` + the project's lint/test targets). Only a fully green gate run earns human attention on the diff — anything a gate can judge must not consume human review time.
+
 ---
 
 ## How to Tell This Is Working
