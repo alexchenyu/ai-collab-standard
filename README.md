@@ -56,9 +56,13 @@
 │   ├── pre-commit.sh                # Bash pre-commit hook（跑 check.sh）
 │   ├── cursor-doc-check-hook.sh     # Cursor afterFileEdit 文档治理检查
 │   ├── cursor-shell-guard-hook.sh   # Cursor beforeShellExecution shell 纪律 gate
-│   └── split_lesson.sh              # 自动拆分 lesson_learned.md
+│   ├── split_lesson.sh              # 自动拆分 lesson_learned.md
+│   ├── install-claude-codex-wrappers.sh   # 本机 claude-kimi / Codex profiles（Linux/macOS/Git Bash）
+│   ├── install-claude-codex-wrappers.ps1  # 同上（Windows cmd / PowerShell）
+│   └── wrappers/claude-codex/             # Windows .ps1/.cmd wrapper 模板
 ├── skills/
-│   └── task-scratchpad/             # Devin-style 本地短期工作记忆 skill
+│   ├── task-scratchpad/             # Devin-style 本地短期工作记忆 skill
+│   └── claude-codex-wrappers/       # LiteLLM 后端切换（Kimi / DeepSeek / official）
 └── docs/
     ├── ai-collab-doc-governance.md           # 治理规范（canonical）
     ├── ai-collab-doc-governance.template.md  # 治理规范（可分发模板）
@@ -227,6 +231,24 @@ bash .ai-collab/scripts/check.sh
 包含 16 类检查：体积 / 状态快照污染 / TODO 残留 / lesson 主题长度 / 子目录 AGENTS.md 迁移 / Cursor MDC alwaysApply / 旧 `.cursorrules` 残留 / Codex 32 KiB 预算 / CLAUDE.md 桩文件 / 行为约束指针 / 共享语言锚点 / Skills 跨 agent 可见性 / 内置 Skills 安装 / Codex skills opt-in / 本地 scratchpad / 跨文件重复。
 
 退出码：`0` 全过 / `1` 硬失败（pre-commit 阻断）/ `2` 仅软警告。
+
+## 本机 Claude Code / Codex 后端切换（可选）
+
+不进项目 git。key 写 `~/.config/litellm/client.env`（Linux/Windows 同一格式，各自用户目录）：
+
+```bash
+# Linux / macOS / Git Bash
+bash .ai-collab/scripts/install-claude-codex-wrappers.sh --key 'sk-你的-virtual-key'
+```
+
+```powershell
+# Windows PowerShell / cmd
+powershell -ExecutionPolicy Bypass -File .ai-collab/scripts/install-claude-codex-wrappers.ps1 -Key 'sk-你的-virtual-key'
+```
+
+之后：`claude-kimi` / `claude-deepseek` / `claude-official` / `codex-kimi` / `codex-deepseek` / `codex-official`。Windows 装的是 `%USERPROFILE%\.local\bin\*.cmd`，需要新开终端让用户 PATH 生效。
+
+详见 `.ai-collab/skills/claude-codex-wrappers/SKILL.md`。不要把 `LITELLM_MASTER_KEY` 当客户端 key。
 
 ## Codex 高级用法
 
