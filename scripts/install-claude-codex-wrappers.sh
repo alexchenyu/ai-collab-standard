@@ -3,6 +3,7 @@
 # 一键安装本机 Claude Code / Codex 切换命令：
 #   claude-kimi / claude-deepseek / claude-official
 #   codex-deepseek / codex-kimi / codex-official
+#   claude-fix-transcripts（修复 Kimi/DeepSeek 中转时期的会话记录，使其可被官方 resume）
 #
 # 会写入 ~/.config/litellm/client.env（客户端 virtual key，不是仓库 .env，
 # 也不是 LITELLM_MASTER_KEY），安装 ~/.local/bin 下的 wrapper，并给
@@ -205,6 +206,89 @@ exec env \
   claude "$@"
 EOF
 
+install_wrapper "$BIN_DIR/claude-fix-transcripts" <<'EOF'
+#!/usr/bin/env bash
+# claude-fix-transcripts
+# 修复 Kimi-K3 / DeepSeek（经 LiteLLM 中转）时期 Claude Code 会话记录（.jsonl）
+# 里的非 Anthropic 官方格式残留，使这些会话可以被 claude / claude-official
+# 正常 resume。
+#
+# 已知三类问题（resume 时全量回放历史，触发官方 API 400）：
+#   1. 工具调用 id 形如 "Bash:12"（含冒号），违反 ^[a-zA-Z0-9_-]+$
+#      报错：tool_use.id: String should match pattern '^[a-zA-Z0-9_-]+$'
+#   2. 空文本块 "text":""（API 要求 text 非空）
+#      报错：text content blocks must be non-empty
+#   3. user/assistant 消息空内容 "content":[] / "content":""
+#
+# 用法：
+#   claude-fix-transcripts <session.jsonl> [更多文件...]
+#   claude-fix-transcripts --all     # 扫描 ~/.claude/projects 下全部 .jsonl
+#
+# 注意：先关闭对应的 Claude Code 会话再修（运行中的会话仍按内存里的旧数据
+# 工作，且继续按旧格式写入）。2 分钟内有写入的文件会被视为活跃会话而跳过。
+# 原文件备份为 <file>.fixbak。修复后重新 claude --resume 选择该会话即可。
+set -u
+
+usage() {
+  sed -n '2,20p' "$0"
+}
+
+fix_one() {
+  local f="$1"
+  if [[ ! -f "$f" ]]; then
+    echo "skip（不存在）: $f"
+    return 0
+  fi
+  local now mtime
+  now=$(date +%s)
+  mtime=$(stat -c %Y "$f" 2>/dev/null || echo 0)
+  if (( now - mtime < 120 )); then
+    echo "skip（2 分钟内有写入，疑似活跃会话，先关闭再修）: $f"
+    return 0
+  fi
+  if ! grep -qE '"(tool_use_)?id":"[A-Za-z][A-Za-z0-9_]*:[0-9]+"|"text":""' "$f"; then
+    echo "ok（无需修复）: $f"
+    return 0
+  fi
+  sed -E -i.fixbak \
+    -e 's/("id":"|"tool_use_id":")([A-Za-z][A-Za-z0-9_]*):([0-9]+")/\1\2_\3/g' \
+    -e 's/"text":""/"text":" "/g' \
+    -e '/"role":"(user|assistant)"/s/"content":\[\]/"content":[{"type":"text","text":" "}]/g' \
+    -e '/"role":"(user|assistant)"/s/"content":""/"content":" "/g' \
+    "$f"
+  if command -v jq >/dev/null 2>&1 && ! jq -e . "$f" >/dev/null 2>&1; then
+    echo "ERROR: 修复后 JSONL 校验失败，备份在 $f.fixbak，请手动恢复" >&2
+    return 1
+  fi
+  echo "fixed: $f（备份: $f.fixbak）"
+  return 0
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+rc=0
+if [[ "${1:-}" == "--all" ]]; then
+  while IFS= read -r f; do
+    fix_one "$f" || rc=1
+  done < <(find "$HOME/.claude/projects" -name '*.jsonl' -type f 2>/dev/null)
+  exit "$rc"
+fi
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+for f in "$@"; do
+  fix_one "$f" || rc=1
+done
+echo "提示：修复后请退出并重开会话（claude --resume 选择该会话）。"
+exit "$rc"
+EOF
+
 install_wrapper "$BIN_DIR/codex-deepseek" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -344,6 +428,7 @@ echo "已安装命令："
 echo "  claude-kimi          # Claude Code + Kimi K3"
 echo "  claude-deepseek      # Claude Code + DeepSeek V4 Flash"
 echo "  claude-official      # Anthropic 官方"
+echo "  claude-fix-transcripts  # 修复 Kimi/DeepSeek 旧会话记录（供官方 resume）"
 echo "  codex-deepseek       # Codex + DeepSeek V4 Flash"
 echo "  codex-kimi           # Codex + Kimi K3"
 echo "  codex-official       # OpenAI 官方"

@@ -48,6 +48,7 @@ Windows: **open a new terminal** after install so User PATH picks up `.local\bin
 | `claude-kimi` | Claude Code → `Kimi-K3` (compact window 502000) |
 | `claude-deepseek` | Claude Code → `DeepSeek-V4-Flash-0731` (compact window 655360) |
 | `claude-official` | Claude Code → Anthropic (unsets LiteLLM env) |
+| `claude-fix-transcripts` | 修复 Kimi/DeepSeek 时期会话记录，使其可被官方 API resume |
 | `codex-kimi` | `codex -p kimi` |
 | `codex-deepseek` | `codex -p deepseek` |
 | `codex-official` | `codex -p openai` |
@@ -56,6 +57,7 @@ Claude wrappers unset `ANTHROPIC_API_KEY`, set `ANTHROPIC_BASE_URL` / `ANTHROPIC
 
 ## Pitfalls
 
+- **中转时期的会话记录不能直接给官方 resume**：Kimi-K3 / DeepSeek 经 LiteLLM 生成的 transcript（`~/.claude/projects/<项目>/<会话>.jsonl`）里，工具调用 id 形如 `Bash:12`（含冒号，违反官方 `^[a-zA-Z0-9_-]+$` 校验），还可能夹带空 `text` 块（`"text":""`）。resume 会全量回放历史，因此用 `claude` / `claude-official` 打开这类会话会每条消息都 400：`tool_use.id: String should match pattern '^[a-zA-Z0-9_-]+$'` 或 `text content blocks must be non-empty`。规则：**谁的会话谁来 resume**；确实要用官方打开旧中转会话时，先关闭该会话，跑 `claude-fix-transcripts <会话文件.jsonl>`（或 `--all` 扫全部），再 `claude --resume`。反过来官方创建的会话（`toolu_` 开头的 id）用三个 wrapper 都能 resume。
 - `~/.claude/settings.json` `"env"` overrides wrapper env. Clear `ANTHROPIC_*` there before using `claude-kimi`.
 - If `/status` still shows `opus*`, delete or change the `"model"` field in `settings.json`.
 - Codex wrappers unset `OPENAI_BASE_URL` / `OPENAI_API_KEY` so profile `env_key = LITELLM_API_KEY` wins.
