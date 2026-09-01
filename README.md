@@ -59,10 +59,12 @@
 │   ├── split_lesson.sh              # 自动拆分 lesson_learned.md
 │   ├── install-claude-codex-wrappers.sh   # 本机 claude-kimi / Codex profiles（Linux/macOS/Git Bash）
 │   ├── install-claude-codex-wrappers.ps1  # 同上（Windows cmd / PowerShell）
+│   ├── install-kimi-code.sh               # 本机 Kimi Code + 自托管 K3（config.toml）
 │   └── wrappers/claude-codex/             # Windows .ps1/.cmd wrapper 模板
 ├── skills/
 │   ├── task-scratchpad/             # Devin-style 本地短期工作记忆 skill
-│   └── claude-codex-wrappers/       # LiteLLM 后端切换（Kimi / DeepSeek / official）
+│   ├── claude-codex-wrappers/       # LiteLLM 后端切换（Kimi / DeepSeek / official）
+│   └── kimi-code-setup/             # Kimi Code CLI → 自托管 K3
 └── docs/
     ├── ai-collab-doc-governance.md           # 治理规范（canonical）
     ├── ai-collab-doc-governance.template.md  # 治理规范（可分发模板）
@@ -249,6 +251,17 @@ powershell -ExecutionPolicy Bypass -File .ai-collab/scripts/install-claude-codex
 之后：`claude-kimi` / `claude-deepseek` / `claude-official` / `codex-kimi` / `codex-deepseek` / `codex-official`。Windows 装的是 `%USERPROFILE%\.local\bin\*.cmd`，需要新开终端让用户 PATH 生效。
 
 详见 `.ai-collab/skills/claude-codex-wrappers/SKILL.md`。不要把 `LITELLM_MASTER_KEY` 当客户端 key。
+
+## 本机 Kimi Code → 自托管 K3（可选）
+
+不绑云端 `/login`。安装 CLI 并写入 `~/.kimi-code/config.toml`（`type = "kimi"`，指向 OpenAI 兼容 `/v1`）：
+
+```bash
+bash .ai-collab/scripts/install-kimi-code.sh
+bash .ai-collab/scripts/install-kimi-code.sh --litellm   # 复用 client.env
+```
+
+之后：`kimi` / `kimi-k3`。`model` 必须等于 serving 的 `--served-model-name`。`export KIMI_API_KEY` 不会被读。详见 `.ai-collab/skills/kimi-code-setup/SKILL.md`。
 
 ## Codex 高级用法
 
