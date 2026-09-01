@@ -30,6 +30,7 @@ Options:
   --project-name NAME    Override project name (default: basename TARGET_DIR)
   --summary TEXT         One-line project summary for AGENTS.md
   --agent-dir DIR        Create DIR/AGENTS.md from template (repeatable)
+  --no-agent-dir         Do not auto-detect per-directory runbooks (AGENTS.md)
   --config-path PATH     Config file path in AGENTS.md (default: auto-detect or TODO)
   --lang LANG            Default language rule: zh | en (default: zh)
   --force                Overwrite existing layout files (AGENTS.md, CLAUDE.md,
@@ -81,6 +82,7 @@ CHECK_ONLY=0
 # 0 = off, 1 = explicit on, -1 = explicit off; auto-detect resolves 0 to 1 when ~/.codex exists.
 ENABLE_CODEX_SKILLS=0
 MIGRATE_LEGACY=0
+NO_AGENT_DIR=0
 declare -a AGENT_DIRS=()
 
 require_arg() {
@@ -106,6 +108,10 @@ while (($# > 0)); do
             require_arg "$1" "${2:-}"
             AGENT_DIRS+=("$2")
             shift 2
+            ;;
+        --no-agent-dir)
+            NO_AGENT_DIR=1
+            shift
             ;;
         --config-path)
             require_arg "$1" "${2:-}"
@@ -303,6 +309,19 @@ auto_detect_agent_dirs() {
     done
 }
 
+# Language-aware template selection: when --lang en is requested, prefer the
+# "<name>.en.md" variant sitting next to the default (zh) template; templates
+# without an EN variant fall back silently. Affects scaffold content language
+# only; rule files (AGENTS.md, 00-core.mdc) get their language rule separately.
+resolve_template() {
+    local src="$1"
+    if [[ "${LANG_OPTION:-zh}" == "en" && -f "${src%.md}.en.md" ]]; then
+        printf '%s\n' "${src%.md}.en.md"
+    else
+        printf '%s\n' "$src"
+    fi
+}
+
 render_template() {
     local src="$1"
     local dst="$2"
@@ -419,7 +438,7 @@ else:
 PY
 }
 
-if [[ "${#AGENT_DIRS[@]}" -eq 0 ]]; then
+if [[ "${#AGENT_DIRS[@]}" -eq 0 && "$NO_AGENT_DIR" -ne 1 ]]; then
     auto_detect_agent_dirs
 fi
 dedupe_dirs
@@ -538,26 +557,36 @@ render_template \
 # User-content files: scaffold once, never auto-overwrite (even with --force).
 # These accumulate real project lessons / status / terms / ADR catalog.
 render_template_protected \
-    "$TEMPLATE_DIR/lesson_learned.template.md" \
+    "$(resolve_template "$TEMPLATE_DIR/lesson_learned.template.md")" \
     "$TARGET_DIR/lesson_learned.md"
 
 render_template_protected \
-    "$TEMPLATE_DIR/PROJECT_STATUS.template.md" \
+    "$(resolve_template "$TEMPLATE_DIR/PROJECT_STATUS.template.md")" \
     "$TARGET_DIR/docs/PROJECT_STATUS.md"
 
 render_template_protected \
-    "$TEMPLATE_DIR/PROJECT_GLOSSARY.template.md" \
-    "$TARGET_DIR/docs/PROJECT_GLOSSARY.md"
+    "$(resolve_template "$TEMPLATE_DIR/PROJECT_GLOSSARY.template.md")" \
+    "$TARGET_DIR/docs/PROJECT_GLOSSARY.md" \
+    "{{PROJECT_NAME}}=$PROJECT_NAME"
 
-render_template_protected \
-    "$TEMPLATE_DIR/ADR-README.template.md" \
-    "$TARGET_DIR/docs/ADR/README.md"
+# Case-collision guard: with a pre-existing lowercase docs/adr store, creating
+# uppercase docs/ADR would collide on case-insensitive filesystems (macOS /
+# Windows). Scaffold a pointer index that routes readers to docs/adr instead.
+if [[ -d "$TARGET_DIR/docs/adr" && ! -e "$TARGET_DIR/docs/ADR/README.md" ]]; then
+    render_template_protected \
+        "$TEMPLATE_DIR/ADR-README-lowercase-pointer.template.md" \
+        "$TARGET_DIR/docs/ADR/README.md"
+else
+    render_template_protected \
+        "$(resolve_template "$TEMPLATE_DIR/ADR-README.template.md")" \
+        "$TARGET_DIR/docs/ADR/README.md"
+fi
 
 # Quality gates inventory: which deterministic constraints exist, at which
 # stage, how strict, and what the escape hatch is. User content after first
 # scaffold (projects register their own lint/test/CI gates here).
 render_template_protected \
-    "$TEMPLATE_DIR/QUALITY_GATES.template.md" \
+    "$(resolve_template "$TEMPLATE_DIR/QUALITY_GATES.template.md")" \
     "$TARGET_DIR/docs/QUALITY_GATES.md" \
     "{{PROJECT_NAME}}=$PROJECT_NAME"
 

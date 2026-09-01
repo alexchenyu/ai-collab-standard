@@ -61,12 +61,12 @@ REPO_ROOT="$(git -C "$TARGET_DIR" rev-parse --show-toplevel)"
 HOOK_PATH="$(git -C "$REPO_ROOT" rev-parse --git-path hooks/pre-commit)"
 HOOK_DIR="$(dirname "$HOOK_PATH")"
 
-if [[ -f "$REPO_ROOT/.ai-collab/scripts/check_ai_collab_docs.py" ]]; then
-    CHECKER_SCRIPT=".ai-collab/scripts/check_ai_collab_docs.py"
-elif [[ -f "$REPO_ROOT/scripts/check_ai_collab_docs.py" ]]; then
-    CHECKER_SCRIPT="scripts/check_ai_collab_docs.py"
+if [[ -f "$REPO_ROOT/.ai-collab/scripts/check.sh" ]]; then
+    CHECKER_SCRIPT=".ai-collab/scripts/check.sh"
+elif [[ -f "$REPO_ROOT/scripts/check.sh" ]]; then
+    CHECKER_SCRIPT="scripts/check.sh"
 else
-    echo "Cannot find check_ai_collab_docs.py in target repo: $REPO_ROOT" >&2
+    echo "Cannot find check.sh in target repo: $REPO_ROOT" >&2
     exit 1
 fi
 
@@ -90,25 +90,23 @@ mkdir -p "$HOOK_DIR"
 cat > "$HOOK_PATH" <<EOF
 #!/usr/bin/env sh
 # AI_COLLAB_PRE_COMMIT
-set -eu
+# Doc-governance gate: run bash check.sh so the hook and the manual
+# 'check.sh' invocation share ONE implementation. Exit codes: 0 pass,
+# 1 hard fail (block commit), 2 soft warnings only (allow, but surface).
+set -u
 
 repo_root="\$(git rev-parse --show-toplevel)"
 cd "\$repo_root"
 
-checker_script="$CHECKER_SCRIPT"
+check_script="$CHECKER_SCRIPT"
 
-if command -v uv >/dev/null 2>&1; then
-    uv run python "\$checker_script"
-elif command -v python3 >/dev/null 2>&1; then
-    python3 "\$checker_script"
-elif command -v python >/dev/null 2>&1; then
-    python "\$checker_script"
-elif command -v py >/dev/null 2>&1; then
-    py -3 "\$checker_script"
-else
-    echo "AI collab pre-commit hook requires uv or Python 3." >&2
-    exit 1
+rc=0
+bash "\$check_script" || rc=\$?
+if [ "\$rc" -eq 2 ]; then
+    echo "[ai-collab] doc-governance soft warnings only; allowing commit (run 'bash \$check_script' to view)."
+    exit 0
 fi
+exit "\$rc"
 EOF
 
 chmod +x "$HOOK_PATH" 2>/dev/null || true

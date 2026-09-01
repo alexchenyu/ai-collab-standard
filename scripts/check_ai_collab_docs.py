@@ -122,6 +122,7 @@ def _check_size(
 
     print("\nAI collab docs governance check failed:", file=sys.stderr)
     print(f"- staged {path} has {lines} lines; limit is {max_lines}.", file=sys.stderr)
+    print(f"  (checks read the STAGED version of {path} — if you already fixed it, re-run `git add` and commit again.)", file=sys.stderr)
     for line in overflow_advice:
         print(f"- {line}", file=sys.stderr)
     print(f"- Deliberate exception for one commit: set {allow_env}=1.", file=sys.stderr)

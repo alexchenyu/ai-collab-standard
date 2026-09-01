@@ -119,7 +119,7 @@ check_no_snapshot_numbers() {
     fi
     # 启发式：匹配 "大数字 + 单位" 的快照类数字
     local hits
-    hits=$(grep -nE '\b[0-9]+[KMG]?\b *(vectors?|docs?|chunks?|rows?|GB|MB|QPS|req/s|张|卡|实例|端口|port)\b|[0-9]{4}-[0-9]{2}-[0-9]{2}|:\s*[0-9]{4,5}\b' "$file" 2>/dev/null | head -5 || true)
+    hits=$(grep -nE '\b[0-9]+[KMG]?\b *(vectors?|docs?|chunks?|rows?|GB|MB|QPS|req/s|张|卡|实例|端口|port)\b|[0-9]{4}-[0-9]{2}-[0-9]{2}|:\s*[0-9]{4,5}\b' "$file" 2>/dev/null | grep -vE 'Generated (at |on )?[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -5 || true)
     if [[ -n "$hits" ]]; then
         local msg="$label 疑似混入状态快照数字（日期 / 规模 / 端口 / 实例数），应迁到 PROJECT_STATUS.md"
         SOFT_WARNS+=("$msg")
@@ -328,6 +328,15 @@ check_claude_stub() {
     local file="$TARGET_DIR/CLAUDE.md"
     if [[ ! -f "$file" ]]; then
         return 0
+    fi
+    # Hard gate aligned with the pre-commit hook (check_ai_collab_docs.py checks
+    # the staged file): >60 lines is no longer a stub. 30..60 remains a soft
+    # warning via CLAUDE_MAX — this keeps both checkers consistent.
+    local claude_lines
+    claude_lines=$(wc -l < "$file" | tr -d ' ')
+    if (( claude_lines > 60 )); then
+        HARD_FAILS+=("CLAUDE.md 超硬限：${claude_lines} > 60 行（entry stub 上限；细则迁 AGENTS.md / docs/）")
+        printf "  \033[31m[FAIL]\033[0m CLAUDE.md %d 行 > 60 硬限\n" "$claude_lines"
     fi
     if grep -q 'AGENTS\.md' "$file" 2>/dev/null; then
         PASSED+=("CLAUDE.md 已指向 AGENTS.md (canonical)")
