@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install-claude-codex-wrappers.sh
 # 一键安装本机 Claude Code / Codex 切换命令：
-#   claude-kimi / claude-deepseek / claude-official
+#   claude-kimi / claude-deepseek / claude-glm / claude-official
 #   codex-deepseek / codex-kimi / codex-official
 #   claude-fix-transcripts（修复 Kimi/DeepSeek 中转时期的会话记录，使其可被官方 resume）
 #
@@ -152,7 +152,8 @@ exec env \
   ANTHROPIC_DEFAULT_HAIKU_MODEL="Kimi-K3" \
   ANTHROPIC_DEFAULT_FABLE_MODEL="Kimi-K3" \
   CLAUDE_CODE_SUBAGENT_MODEL="Kimi-K3" \
-  CLAUDE_CODE_AUTO_COMPACT_WINDOW="502000" \
+  CLAUDE_CODE_AUTO_COMPACT_WINDOW="1048576" \
+  CLAUDE_CODE_MAX_CONTEXT_TOKENS="1048576" \
   CLAUDE_CODE_EFFORT_LEVEL="max" \
   claude "$@"
 EOF
@@ -182,6 +183,37 @@ exec env \
   ANTHROPIC_DEFAULT_FABLE_MODEL="DeepSeek-V4-Flash-0731" \
   CLAUDE_CODE_SUBAGENT_MODEL="DeepSeek-V4-Flash-0731" \
   CLAUDE_CODE_AUTO_COMPACT_WINDOW="655360" \
+  CLAUDE_CODE_MAX_CONTEXT_TOKENS="655360" \
+  CLAUDE_CODE_EFFORT_LEVEL="max" \
+  claude "$@"
+EOF
+
+install_wrapper "$BIN_DIR/claude-glm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+CLIENT_ENV="${LITELLM_CLIENT_ENV:-$HOME/.config/litellm/client.env}"
+if [[ -f "$CLIENT_ENV" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$CLIENT_ENV"
+  set +a
+fi
+: "${LITELLM_API_KEY:?请先在 ~/.config/litellm/client.env 写入 LITELLM_API_KEY}"
+
+exec env \
+  -u ANTHROPIC_API_KEY \
+  ANTHROPIC_BASE_URL="${LITELLM_BASE_URL:-http://us-agent.supermicro.com:4500}" \
+  ANTHROPIC_AUTH_TOKEN="$LITELLM_API_KEY" \
+  ANTHROPIC_MODEL="GLM-5.3" \
+  ANTHROPIC_SMALL_FAST_MODEL="GLM-5.3" \
+  ANTHROPIC_DEFAULT_OPUS_MODEL="GLM-5.3" \
+  ANTHROPIC_DEFAULT_SONNET_MODEL="GLM-5.3" \
+  ANTHROPIC_DEFAULT_HAIKU_MODEL="GLM-5.3" \
+  ANTHROPIC_DEFAULT_FABLE_MODEL="GLM-5.3" \
+  CLAUDE_CODE_SUBAGENT_MODEL="GLM-5.3" \
+  CLAUDE_CODE_AUTO_COMPACT_WINDOW="563392" \
+  CLAUDE_CODE_MAX_CONTEXT_TOKENS="563392" \
   CLAUDE_CODE_EFFORT_LEVEL="max" \
   claude "$@"
 EOF
@@ -202,6 +234,7 @@ exec env \
   -u ANTHROPIC_DEFAULT_FABLE_MODEL \
   -u CLAUDE_CODE_SUBAGENT_MODEL \
   -u CLAUDE_CODE_AUTO_COMPACT_WINDOW \
+  -u CLAUDE_CODE_MAX_CONTEXT_TOKENS \
   -u CLAUDE_CODE_EFFORT_LEVEL \
   claude "$@"
 EOF
@@ -427,6 +460,7 @@ echo
 echo "已安装命令："
 echo "  claude-kimi          # Claude Code + Kimi K3"
 echo "  claude-deepseek      # Claude Code + DeepSeek V4 Flash"
+echo "  claude-glm           # Claude Code + GLM-5.3"
 echo "  claude-official      # Anthropic 官方"
 echo "  claude-fix-transcripts  # 修复 Kimi/DeepSeek 旧会话记录（供官方 resume）"
 echo "  codex-deepseek       # Codex + DeepSeek V4 Flash"

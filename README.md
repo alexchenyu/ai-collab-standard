@@ -248,7 +248,7 @@ bash .ai-collab/scripts/install-claude-codex-wrappers.sh --key 'sk-你的-virtua
 powershell -ExecutionPolicy Bypass -File .ai-collab/scripts/install-claude-codex-wrappers.ps1 -Key 'sk-你的-virtual-key'
 ```
 
-之后：`claude-kimi` / `claude-deepseek` / `claude-official` / `codex-kimi` / `codex-deepseek` / `codex-official`。Windows 装的是 `%USERPROFILE%\.local\bin\*.cmd`，需要新开终端让用户 PATH 生效。
+之后：`claude-kimi` / `claude-deepseek` / `claude-glm` / `claude-official` / `codex-kimi` / `codex-deepseek` / `codex-official`。Windows 装的是 `%USERPROFILE%\.local\bin\*.cmd`，需要新开终端让用户 PATH 生效。
 
 详见 `.ai-collab/skills/claude-codex-wrappers/SKILL.md`。不要把 `LITELLM_MASTER_KEY` 当客户端 key。
 

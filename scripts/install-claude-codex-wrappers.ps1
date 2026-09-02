@@ -6,7 +6,8 @@
         PowerShell counterpart to install-claude-codex-wrappers.sh.
         Writes ~/.config/litellm/client.env (bash-compatible, shared with WSL/Git Bash),
         copies wrappers to ~/.local/bin as .ps1 + .cmd (cmd/PowerShell can run claude-kimi),
-        and appends Codex LiteLLM profiles without changing the top-level official model.
+        including claude-fix-transcripts, and appends Codex LiteLLM profiles without
+        changing the top-level official model.
 
     .PARAMETER Key
         LiteLLM virtual key (not LITELLM_MASTER_KEY). Omit to reuse client.env.
@@ -270,7 +271,9 @@ if (-not (Test-Path -LiteralPath $BinDir)) {
 $names = @(
     "claude-kimi",
     "claude-deepseek",
+    "claude-glm",
     "claude-official",
+    "claude-fix-transcripts",
     "codex-kimi",
     "codex-deepseek",
     "codex-official"
@@ -290,7 +293,9 @@ Write-Host ""
 Write-Host "Installed commands:"
 Write-Host "  claude-kimi          # Claude Code + Kimi K3"
 Write-Host "  claude-deepseek      # Claude Code + DeepSeek V4 Flash"
+Write-Host "  claude-glm           # Claude Code + GLM-5.3"
 Write-Host "  claude-official      # Anthropic official"
+Write-Host "  claude-fix-transcripts  # Repair Kimi/DeepSeek transcripts for official resume"
 Write-Host "  codex-deepseek       # Codex + DeepSeek V4 Flash"
 Write-Host "  codex-kimi           # Codex + Kimi K3"
 Write-Host "  codex-official       # OpenAI official"

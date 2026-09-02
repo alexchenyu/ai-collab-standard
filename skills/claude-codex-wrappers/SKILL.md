@@ -1,6 +1,6 @@
 ---
 name: claude-codex-wrappers
-description: Install and use machine-local Claude Code / Codex backend wrappers (claude-kimi, claude-deepseek, claude-official, codex-kimi, codex-deepseek, codex-official) via LiteLLM on Linux/macOS/Windows. Use when the user asks to run Claude Code on Kimi/DeepSeek, switch Codex profiles, install claude-kimi, or recreate ~/.local/bin wrappers.
+description: Install and use machine-local Claude Code / Codex backend wrappers (claude-kimi, claude-deepseek, claude-glm, claude-official, codex-kimi, codex-deepseek, codex-official) via LiteLLM on Linux/macOS/Windows. Use when the user asks to run Claude Code on Kimi/DeepSeek/GLM, switch Codex profiles, install claude-kimi, or recreate ~/.local/bin wrappers.
 ---
 
 # Claude Code / Codex LiteLLM wrappers
@@ -39,14 +39,15 @@ Default LAN: `http://us-agent.supermicro.com:4500`. `--wan` / `-Wan` → `https:
 
 Reject `LITELLM_MASTER_KEY` / `sk-supersuper*` — gateway master keys, not client virtual keys.
 
-Windows: **open a new terminal** after install so User PATH picks up `.local\bin`. `claude-kimi` works in cmd and PowerShell via the `.cmd` shim (`ExecutionPolicy Bypass` on that invoke only).
+Windows: **open a new terminal** after install so User PATH picks up `.local\bin`. `claude-kimi` / `claude-fix-transcripts` work in cmd and PowerShell via the `.cmd` shim (`ExecutionPolicy Bypass` on that invoke only). `--all` 扫 `%USERPROFILE%\.claude\projects`。
 
 ## Commands
 
 | Command | Backend |
 | --- | --- |
-| `claude-kimi` | Claude Code → `Kimi-K3` (compact window 502000) |
-| `claude-deepseek` | Claude Code → `DeepSeek-V4-Flash-0731` (compact window 655360) |
+| `claude-kimi` | Claude Code → `Kimi-K3` (1M: `CLAUDE_CODE_MAX_CONTEXT_TOKENS` + compact 1048576) |
+| `claude-deepseek` | Claude Code → `DeepSeek-V4-Flash-0731` (compact 655360) |
+| `claude-glm` | Claude Code → `GLM-5.3` (served `--max-model-len=563392`) |
 | `claude-official` | Claude Code → Anthropic (unsets LiteLLM env) |
 | `claude-fix-transcripts` | 修复 Kimi/DeepSeek 时期会话记录，使其可被官方 API resume |
 | `codex-kimi` | `codex -p kimi` |
@@ -54,6 +55,8 @@ Windows: **open a new terminal** after install so User PATH picks up `.local\bin
 | `codex-official` | `codex -p openai` |
 
 Claude wrappers unset `ANTHROPIC_API_KEY`, set `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`, and pin **all** `ANTHROPIC_DEFAULT_*` + `CLAUDE_CODE_SUBAGENT_MODEL` to the same model so `/status` and subagents cannot silently fall back to opus.
+
+LiteLLM 模型 id（`Kimi-K3` / `GLM-5.3` / …）Claude Code 不认识，会按 **200k** 当成模型上限。只设 `CLAUDE_CODE_AUTO_COMPACT_WINDOW=502000` 会显示 `502k · capped to 200k by model`，实际还是 200k。必须同时设 `CLAUDE_CODE_MAX_CONTEXT_TOKENS` 为真实窗口（Kimi：`1048576`；GLM：当前 serving `--max-model-len=563392`）。见 [Correct the window for a gateway or custom model ID](https://code.claude.com/docs/en/model-config)。
 
 ## Pitfalls
 
