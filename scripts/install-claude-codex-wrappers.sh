@@ -20,10 +20,12 @@ set -euo pipefail
 
 LAN_BASE_URL="http://us-agent.supermicro.com:4500"
 WAN_BASE_URL="https://api.365ui.com"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLIENT_ENV="${LITELLM_CLIENT_ENV:-$HOME/.config/litellm/client.env}"
 BIN_DIR="${HOME}/.local/bin"
 CODEX_TOML="${HOME}/.codex/config.toml"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
+KIMI_IMAGE_GUARD_SRC="$SCRIPT_DIR/wrappers/claude-codex/claude-kimi-image-guard.js"
 
 KEY=""
 BASE_URL="$LAN_BASE_URL"
@@ -128,11 +130,32 @@ install_wrapper() {
 
 mkdir -p "$BIN_DIR"
 
+cp "$KIMI_IMAGE_GUARD_SRC" "$BIN_DIR/claude-kimi-image-guard.js"
+cat > "$BIN_DIR/claude-kimi-settings.json" <<'EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.local/bin/claude-kimi-image-guard.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+chmod 644 "$BIN_DIR/claude-kimi-image-guard.js" "$BIN_DIR/claude-kimi-settings.json"
+
 install_wrapper "$BIN_DIR/claude-kimi" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
 CLIENT_ENV="${LITELLM_CLIENT_ENV:-$HOME/.config/litellm/client.env}"
+KIMI_SETTINGS="${LITELLM_KIMI_SETTINGS:-$HOME/.local/bin/claude-kimi-settings.json}"
 if [[ -f "$CLIENT_ENV" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -155,7 +178,7 @@ exec env \
   CLAUDE_CODE_AUTO_COMPACT_WINDOW="900000" \
   CLAUDE_CODE_MAX_CONTEXT_TOKENS="1048576" \
   CLAUDE_CODE_EFFORT_LEVEL="max" \
-  claude "$@"
+  claude --settings "$KIMI_SETTINGS" "$@"
 EOF
 
 install_wrapper "$BIN_DIR/claude-deepseek" <<'EOF'
@@ -469,6 +492,7 @@ echo "  codex-official       # OpenAI 官方"
 echo
 echo "client.env: $CLIENT_ENV"
 echo "LiteLLM:    $BASE_URL"
+echo "Kimi guard: $BIN_DIR/claude-kimi-image-guard.js (>100KB image Read denied)"
 echo "新开一个终端后直接跑 claude-kimi 或 codex-deepseek。"
 
 if ! command -v claude >/dev/null 2>&1; then
@@ -476,6 +500,9 @@ if ! command -v claude >/dev/null 2>&1; then
 fi
 if ! command -v codex >/dev/null 2>&1; then
   echo "WARN: 未找到 codex。先安装：npm install -g @openai/codex" >&2
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "WARN: 未找到 node，claude-kimi 的大图 Read 门禁不会运行。请安装 Node.js。" >&2
 fi
 if [[ -f "$CLAUDE_SETTINGS" ]] && grep -q '"env"' "$CLAUDE_SETTINGS"; then
   echo "WARN: ~/.claude/settings.json 含 env 字段，会覆盖 wrapper 环境变量。跑 claude-kimi 前清掉 ANTHROPIC_*。" >&2

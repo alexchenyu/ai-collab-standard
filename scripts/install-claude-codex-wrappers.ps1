@@ -48,6 +48,7 @@ $BinDir = Join-Path $HomeDir ".local\bin"
 $CodexToml = Join-Path $HomeDir ".codex\config.toml"
 $ClaudeSettings = Join-Path $HomeDir ".claude\settings.json"
 $WrapperSrc = Join-Path $PSScriptRoot "wrappers\claude-codex"
+$KimiImageGuardSrc = Join-Path $WrapperSrc "claude-kimi-image-guard.js"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
@@ -279,6 +280,25 @@ $names = @(
     "codex-official"
 )
 Copy-Item -LiteralPath (Join-Path $WrapperSrc "_litellm-wrappers.ps1") -Destination (Join-Path $BinDir "_litellm-wrappers.ps1") -Force
+$kimiImageGuard = Join-Path $BinDir "claude-kimi-image-guard.js"
+$kimiSettings = Join-Path $BinDir "claude-kimi-settings.json"
+Copy-Item -LiteralPath $KimiImageGuardSrc -Destination $kimiImageGuard -Force
+$kimiSettingsBody = [ordered]@{
+    hooks = [ordered]@{
+        PreToolUse = @(
+            [ordered]@{
+                matcher = "Read"
+                hooks = @(
+                    [ordered]@{
+                        type = "command"
+                        command = "node `"$kimiImageGuard`""
+                    }
+                )
+            }
+        )
+    }
+} | ConvertTo-Json -Depth 8
+Write-Utf8NoBomFile $kimiSettings $kimiSettingsBody
 $shim = Get-Content -LiteralPath (Join-Path $WrapperSrc "shim.cmd") -Raw
 foreach ($name in $names) {
     Copy-Item -LiteralPath (Join-Path $WrapperSrc "$name.ps1") -Destination (Join-Path $BinDir "$name.ps1") -Force
@@ -302,6 +322,7 @@ Write-Host "  codex-official       # OpenAI official"
 Write-Host ""
 Write-Host "client.env: $ClientEnv"
 Write-Host "LiteLLM:    $resolvedBase"
+Write-Host "Kimi guard: $kimiImageGuard (>100KB image Read denied)"
 Write-Host "Open a new terminal, then run claude-kimi or codex-deepseek."
 
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
@@ -309,6 +330,9 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
 }
 if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
     Write-Warning "codex was not found. Install it with: npm install -g @openai/codex"
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Warning "node was not found. The claude-kimi oversized-image Read guard will not run. Install Node.js."
 }
 if (Test-Path -LiteralPath $ClaudeSettings) {
     $settings = Get-Content -LiteralPath $ClaudeSettings -Raw

@@ -69,6 +69,8 @@ function Invoke-ClaudeLiteLLM {
     param(
         [Parameter(Mandatory = $true)][string]$Model,
         [Parameter(Mandatory = $true)][string]$CompactWindow,
+        [string]$MaxContext = "",
+        [string]$SettingsPath = "",
         [string[]]$CliArgs
     )
     Import-LiteLLMClientEnv
@@ -83,9 +85,16 @@ function Invoke-ClaudeLiteLLM {
     $env:ANTHROPIC_DEFAULT_FABLE_MODEL = $Model
     $env:CLAUDE_CODE_SUBAGENT_MODEL = $Model
     $env:CLAUDE_CODE_AUTO_COMPACT_WINDOW = $CompactWindow
-    $env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = $CompactWindow
+    if ($MaxContext) {
+        $env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = $MaxContext
+    } else {
+        $env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = $CompactWindow
+    }
     $env:CLAUDE_CODE_EFFORT_LEVEL = "max"
-    Invoke-TrackedCli -Name "claude" -InstallHint "npm install -g @anthropic-ai/claude-code" -CliArgs $CliArgs
+    $forward = @()
+    if ($SettingsPath) { $forward += @("--settings", $SettingsPath) }
+    if ($CliArgs) { $forward += $CliArgs }
+    Invoke-TrackedCli -Name "claude" -InstallHint "npm install -g @anthropic-ai/claude-code" -CliArgs $forward
 }
 
 function Invoke-ClaudeOfficial {
