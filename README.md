@@ -69,6 +69,7 @@
     ├── ai-collab-doc-governance.md           # 治理规范（canonical）
     ├── ai-collab-doc-governance.template.md  # 治理规范（可分发模板）
     ├── ai-collab-agent-behavior.md           # Agent 行为约束（canonical）
+    ├── pi-custom-provider-setup.md            # Pi 自定义模型配置
     ├── AGENTS.template.md                    # 根 AGENTS.md 模板（canonical）
     ├── CLAUDE.template.md                    # Claude Code 桩模板
     ├── cursor-rule-core.mdc.template         # Cursor alwaysApply 模板
@@ -262,6 +263,12 @@ bash .ai-collab/scripts/install-kimi-code.sh --litellm   # 复用 client.env
 ```
 
 之后：`kimi` / `kimi-k3`。`model` 必须等于 serving 的 `--served-model-name`。`export KIMI_API_KEY` 不会被读。详见 `.ai-collab/skills/kimi-code-setup/SKILL.md`。
+
+## Pi 自定义模型（可选）
+
+Pi 通过 `~/.pi/agent/models.json` 接入 OpenAI-compatible provider，并可从独立 env
+文件动态读取 API key。Kimi、GLM、Grok 的完整配置和验证命令见
+[`docs/pi-custom-provider-setup.md`](docs/pi-custom-provider-setup.md)。
 
 ## Codex 高级用法
 
