@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  claude-switch <official|kimi> [--continue]
+  claude-switch <official|kimi> --resume SESSION_ID [CLAUDE_ARGS...]
+
+Run from the project whose Claude Code session you want to continue.
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+backend="$1"
+shift
+case "$backend" in
+  official|kimi) ;;
+  *)
+    echo "claude-switch: backend must be official or kimi: $backend" >&2
+    exit 1
+    ;;
+esac
+
+prep_args=(--backend "$backend" --continue --cwd "$PWD")
+if [[ "${1:-}" == "--continue" ]]; then
+  shift
+elif [[ "${1:-}" == "--resume" ]]; then
+  if [[ -z "${2:-}" ]]; then
+    echo "claude-switch: --resume requires a session ID" >&2
+    exit 1
+  fi
+  prep_args=(--backend "$backend" --resume "$2" --cwd "$PWD")
+  shift 2
+fi
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PREP="$SCRIPT_DIR/claude-session-prep.js"
+if ! command -v node >/dev/null 2>&1; then
+  echo "claude-switch: node is required" >&2
+  exit 1
+fi
+
+session_id="$(node "$PREP" "${prep_args[@]}")"
+if [[ -z "$session_id" ]]; then
+  echo "claude-switch: session preparation returned no session ID" >&2
+  exit 1
+fi
+
+if [[ "$backend" == "official" ]]; then
+  exec claude-official --model default --resume "$session_id" "$@"
+fi
+exec claude-kimi --resume "$session_id" "$@"

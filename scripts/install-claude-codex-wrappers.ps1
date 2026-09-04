@@ -274,6 +274,7 @@ $names = @(
     "claude-deepseek",
     "claude-glm",
     "claude-official",
+    "claude-switch",
     "claude-fix-transcripts",
     "codex-kimi",
     "codex-deepseek",
@@ -283,6 +284,7 @@ Copy-Item -LiteralPath (Join-Path $WrapperSrc "_litellm-wrappers.ps1") -Destinat
 $kimiImageGuard = Join-Path $BinDir "claude-kimi-image-guard.js"
 $kimiSettings = Join-Path $BinDir "claude-kimi-settings.json"
 Copy-Item -LiteralPath $KimiImageGuardSrc -Destination $kimiImageGuard -Force
+Copy-Item -LiteralPath (Join-Path $WrapperSrc "claude-session-prep.js") -Destination (Join-Path $BinDir "claude-session-prep.js") -Force
 $kimiSettingsBody = [ordered]@{
     hooks = [ordered]@{
         PreToolUse = @(
@@ -315,6 +317,7 @@ Write-Host "  claude-kimi          # Claude Code + Kimi K3"
 Write-Host "  claude-deepseek      # Claude Code + DeepSeek V4 Flash"
 Write-Host "  claude-glm           # Claude Code + GLM-5.3"
 Write-Host "  claude-official      # Anthropic official"
+Write-Host "  claude-switch        # Safely switch official/kimi on one session"
 Write-Host "  claude-fix-transcripts  # Repair Kimi/DeepSeek transcripts for official resume"
 Write-Host "  codex-deepseek       # Codex + DeepSeek V4 Flash"
 Write-Host "  codex-kimi           # Codex + Kimi K3"

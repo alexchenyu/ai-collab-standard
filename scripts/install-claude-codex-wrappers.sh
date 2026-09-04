@@ -25,7 +25,8 @@ CLIENT_ENV="${LITELLM_CLIENT_ENV:-$HOME/.config/litellm/client.env}"
 BIN_DIR="${HOME}/.local/bin"
 CODEX_TOML="${HOME}/.codex/config.toml"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
-KIMI_IMAGE_GUARD_SRC="$SCRIPT_DIR/wrappers/claude-codex/claude-kimi-image-guard.js"
+CLAUDE_WRAPPER_SRC="$SCRIPT_DIR/wrappers/claude-codex"
+KIMI_IMAGE_GUARD_SRC="$CLAUDE_WRAPPER_SRC/claude-kimi-image-guard.js"
 
 KEY=""
 BASE_URL="$LAN_BASE_URL"
@@ -131,6 +132,8 @@ install_wrapper() {
 mkdir -p "$BIN_DIR"
 
 cp "$KIMI_IMAGE_GUARD_SRC" "$BIN_DIR/claude-kimi-image-guard.js"
+cp "$CLAUDE_WRAPPER_SRC/claude-session-prep.js" "$BIN_DIR/claude-session-prep.js"
+cp "$CLAUDE_WRAPPER_SRC/claude-switch" "$BIN_DIR/claude-switch"
 cat > "$BIN_DIR/claude-kimi-settings.json" <<'EOF'
 {
   "hooks": {
@@ -148,7 +151,11 @@ cat > "$BIN_DIR/claude-kimi-settings.json" <<'EOF'
   }
 }
 EOF
-chmod 644 "$BIN_DIR/claude-kimi-image-guard.js" "$BIN_DIR/claude-kimi-settings.json"
+chmod 755 "$BIN_DIR/claude-switch"
+chmod 644 \
+  "$BIN_DIR/claude-kimi-image-guard.js" \
+  "$BIN_DIR/claude-session-prep.js" \
+  "$BIN_DIR/claude-kimi-settings.json"
 
 install_wrapper "$BIN_DIR/claude-kimi" <<'EOF'
 #!/usr/bin/env bash
@@ -485,6 +492,7 @@ echo "  claude-kimi          # Claude Code + Kimi K3"
 echo "  claude-deepseek      # Claude Code + DeepSeek V4 Flash"
 echo "  claude-glm           # Claude Code + GLM-5.3"
 echo "  claude-official      # Anthropic 官方"
+echo "  claude-switch        # 安全切换 official/kimi 并继续同一 session"
 echo "  claude-fix-transcripts  # 修复 Kimi/DeepSeek 旧会话记录（供官方 resume）"
 echo "  codex-deepseek       # Codex + DeepSeek V4 Flash"
 echo "  codex-kimi           # Codex + Kimi K3"

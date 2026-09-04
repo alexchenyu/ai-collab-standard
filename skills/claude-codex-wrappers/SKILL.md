@@ -49,6 +49,7 @@ Windows: **open a new terminal** after install so User PATH picks up `.local\bin
 | `claude-deepseek` | Claude Code → `DeepSeek-V4-Flash-0731` (compact 655360) |
 | `claude-glm` | Claude Code → `GLM-5.3` (served `--max-model-len=563392`) |
 | `claude-official` | Claude Code → Anthropic (unsets LiteLLM env) |
+| `claude-switch` | Safely switch one session between `official` and `kimi` |
 | `claude-fix-transcripts` | 修复 Kimi/DeepSeek 时期会话记录，使其可被官方 API resume |
 | `codex-kimi` | `codex -p kimi` |
 | `codex-deepseek` | `codex -p deepseek` |
@@ -58,11 +59,23 @@ Claude wrappers unset `ANTHROPIC_API_KEY`, set `ANTHROPIC_BASE_URL` / `ANTHROPIC
 
 LiteLLM 模型 id（`Kimi-K3` / `GLM-5.3` / …）Claude Code 不认识，会按 **200k** 当成模型上限。只设 `CLAUDE_CODE_AUTO_COMPACT_WINDOW=900000` 会显示 `900k · capped to 200k by model`，实际还是 200k。必须同时设 `CLAUDE_CODE_MAX_CONTEXT_TOKENS` 为真实窗口（Kimi：`1048576`；GLM：当前 serving `--max-model-len=563392`）。Kimi 保留 `900000` 自动压缩阈值；wrapper 通过 session-only `--settings` 注入 `PreToolUse` hook，阻止大于 100KB 的图片 `Read`，避免 image base64 单次增加约 400K tokens。见 [Correct the window for a gateway or custom model ID](https://code.claude.com/docs/en/model-config)。
 
+## Switch backends on one session
+
+先退出当前 Claude Code，然后在项目根目录运行：
+
+```bash
+claude-switch official --continue
+claude-switch kimi --continue
+claude-switch official --resume <session-id>
+```
+
+`claude-switch` 只选择当前项目最新 session（或显式 ID），确认 transcript 短时间内没有继续写入，按需创建 `.switchbak-<timestamp>` 备份，统一修复非法 tool IDs / 空文本块 / `provider_specific_fields`，并清除大于 100K base64 字符的历史图片。任何准备步骤失败都不会启动目标后端。切到 official 时显式使用 `--model default`，避免尝试恢复 `Kimi-K3` model id。
+
 ## Pitfalls
 
 - Wrapper 环境变量只在启动时注入，已打开的 Claude Code 进程不会热更新。会话已超过服务端硬上限时，`/compact` 也会因摘要请求携带超限历史而失败；先用 `Esc Esc` / `/rewind` 回退到大输出前并立即 `/compact`，然后退出并用新 wrapper resume。无法回退时只能新开会话，工作区文件不会丢。
 - Kimi/LiteLLM 链路读取 PNG 时可能把图片 base64 计入文本 token：约 600KB PNG 曾让下一次请求增加约 400K tokens。`claude-kimi` 默认拒绝读取大于 100KB 的 GIF/JPEG/PNG/WebP；先生成不超过 100KB 的预览，或交给正确支持 image content block 的 vision 模型。该 hook 只通过 wrapper 的 `--settings` 作用于当前 Kimi 会话，不修改 `~/.claude/settings.json`，也不影响官方 Claude。
-- **中转时期的会话记录不能直接给官方 resume**：Kimi-K3 / DeepSeek 经 LiteLLM 生成的 transcript（`~/.claude/projects/<项目>/<会话>.jsonl`）里，工具调用 id 形如 `Bash:12`（含冒号，违反官方 `^[a-zA-Z0-9_-]+$` 校验），还可能夹带空 `text` 块（`"text":""`）。resume 会全量回放历史，因此用 `claude` / `claude-official` 打开这类会话会每条消息都 400：`tool_use.id: String should match pattern '^[a-zA-Z0-9_-]+$'` 或 `text content blocks must be non-empty`。规则：**谁的会话谁来 resume**；确实要用官方打开旧中转会话时，先关闭该会话，跑 `claude-fix-transcripts <会话文件.jsonl>`（或 `--all` 扫全部），再 `claude --resume`。反过来官方创建的会话（`toolu_` 开头的 id）用三个 wrapper 都能 resume。
+- **不要直接用 `claude` resume Kimi session**：Kimi/LiteLLM transcript 的 `Bash:12` 一类 tool ID 不符合官方校验，还可能有空 `text` 块。优先用 `claude-switch official --continue` 自动修复并启动；手工恢复时先关闭会话，运行 `claude-fix-transcripts <session.jsonl>`，再 `claude --resume`。官方创建的 `toolu_` ID 可被 Kimi 接受。
 - `~/.claude/settings.json` `"env"` overrides wrapper env. Clear `ANTHROPIC_*` there before using `claude-kimi`.
 - If `/status` still shows `opus*`, delete or change the `"model"` field in `settings.json`.
 - Codex wrappers unset `OPENAI_BASE_URL` / `OPENAI_API_KEY` so profile `env_key = LITELLM_API_KEY` wins.
